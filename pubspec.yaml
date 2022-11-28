@@ -11,6 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   wakelock: ^0.5.6
+  focus_detector: ^2.0.1
   visibility_detector: ^0.2.0
   xml: ^5.3.0
   pedantic: ^1.11.1

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:focus_detector/focus_detector.dart';
 import 'package:pip_flutter/pipflutter_player_configuration.dart';
 import 'package:pip_flutter/pipflutter_player_controller.dart';
 import 'package:pip_flutter/pipflutter_player_controller_event.dart';
@@ -279,13 +280,23 @@ class _PipFlutterPlayerState extends State<PipFlutterPlayer>
   }
 
   Widget _buildPlayer() {
-    return VisibilityDetector(
-      key: Key("${widget.controller.hashCode}_key"),
-      onVisibilityChanged: (VisibilityInfo info) =>
-          widget.controller.onPlayerVisibilityChanged(info.visibleFraction),
-      child: PipFlutterPlayerWithControls(
-        controller: widget.controller,
+    return FocusDetector(
+      child:VisibilityDetector(
+        key: Key("${widget.controller.hashCode}_key"),
+        onVisibilityChanged: (VisibilityInfo info){
+          print("_buildPlayer====>>> info::${info.visibleFraction}");
+          widget.controller.onPlayerVisibilityChanged(info.visibleFraction);
+        },
+        child: PipFlutterPlayerWithControls(
+          controller: widget.controller,
+        ),
       ),
+      onFocusLost: (){
+        print("_buildPlayer====>>> onFocusLost");
+      },
+      onFocusGained: (){
+        print("_buildPlayer====>>> onFocusGained");
+      },
     );
   }
 

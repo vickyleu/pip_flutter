@@ -74,7 +74,7 @@ bool _remoteCommandsInitialized = false;
     }];
     // Start the long-running task
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        [self.channel invokeMethod:@"prepareToPip" arguments:nil];
+        //[self.channel invokeMethod:@"prepareToPip" arguments:nil];
         while (true && self.bgTask != UIBackgroundTaskInvalid) {
             NSLog(@"后台不停");
             [self notifyDart:player];
