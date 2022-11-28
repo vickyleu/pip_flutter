@@ -2,11 +2,10 @@ package com.example.pip_flutter
 
 import android.content.Context
 import android.util.Log
-import com.google.android.exoplayer2.upstream.cache.SimpleCache
+import com.google.android.exoplayer2.database.StandaloneDatabaseProvider
 import com.google.android.exoplayer2.upstream.cache.LeastRecentlyUsedCacheEvictor
-import com.google.android.exoplayer2.database.ExoDatabaseProvider
+import com.google.android.exoplayer2.upstream.cache.SimpleCache
 import java.io.File
-import java.lang.Exception
 
 object PipFlutterPlayerCache {
     @Volatile
@@ -18,7 +17,7 @@ object PipFlutterPlayerCache {
                     instance = SimpleCache(
                         File(context.cacheDir, "pipFlutterPlayerCache"),
                         LeastRecentlyUsedCacheEvictor(cacheFileSize),
-                        ExoDatabaseProvider(context)
+                        StandaloneDatabaseProvider(context)
                     )
                 }
             }
@@ -29,10 +28,8 @@ object PipFlutterPlayerCache {
     @JvmStatic
     fun releaseCache() {
         try {
-            if (instance != null) {
-                instance!!.release()
-                instance = null
-            }
+            instance?.release()
+            instance = null
         } catch (exception: Exception) {
             Log.e("PipFlutterPlayerCache", exception.toString())
         }

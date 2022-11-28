@@ -6,8 +6,14 @@
 #error Code Requires ARC.
 #endif
 
-
+@interface PipFlutterPlugin()
+@property (nonatomic, strong)FlutterMethodChannel* channel;
+@property (nonatomic, assign)UIBackgroundTaskIdentifier bgTask;
+@end
 @implementation PipFlutterPlugin
+
+static PipFlutterPlugin *_sharedInstance = nil;
+
 NSMutableDictionary* _dataSourceDict;
 NSMutableDictionary*  _timeObserverIdDict;
 NSMutableDictionary*  _artworkImageDict;
@@ -17,17 +23,77 @@ PipFlutter* _notificationPlayer;
 bool _remoteCommandsInitialized = false;
 
 
++(instancetype) shareInstance
+{
+    return _sharedInstance ;
+}
+
 #pragma mark - FlutterPlugin protocol
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
-    FlutterMethodChannel* channel =
-    [FlutterMethodChannel methodChannelWithName:@"pipflutter_player_channel"
-                                binaryMessenger:[registrar messenger]];
     PipFlutterPlugin* instance = [[PipFlutterPlugin alloc] initWithRegistrar:registrar];
+    FlutterMethodChannel* channel =
+            [FlutterMethodChannel methodChannelWithName:@"pipflutter_player_channel"
+                                        binaryMessenger:[registrar messenger]];
+    instance.channel = channel;
+    _sharedInstance = instance;
     [registrar addMethodCallDelegate:instance channel:channel];
+    [registrar addApplicationDelegate:instance];
     //[registrar publish:instance];
     [registrar registerViewFactory:instance withId:@"com.pipflutter/pipflutter_player"];
 }
 
+
+-(void) applicationDidEnterBackground:(UIApplication *)application{
+    if ([_players count] != 1) return;
+    PipFlutter * player = [[_players allValues] lastObject] ;
+    if ([player isPlaying]&& ![player isPiping] ) {
+        [self backgroundHandler:player];
+    }
+}
+
+
+-(void)notifyDart:(PipFlutter *)player{
+    NSInteger position = [@(player.position) integerValue];
+    NSInteger duration =[@(player.duration) integerValue];
+    [self.channel invokeMethod:@"pipNotify" arguments:@{@"position":@(position),@"duration":@(duration)}];
+}
+
+
+- (void)backgroundHandler:(PipFlutter *)player {
+    NSLog(@"### -->backgroundinghandler");
+    UIApplication *app = [UIApplication sharedApplication];
+     self.bgTask = [app beginBackgroundTaskWithExpirationHandler:^{
+        dispatch_async(dispatch_get_main_queue(),^{
+            if( self.bgTask != UIBackgroundTaskInvalid){
+//                bgTask = UIBackgroundTaskInvalid;
+            }
+        });
+        NSLog(@"====任务完成了。。。。。。。。。。。。。。。===>");
+        // [app endBackgroundTask:bgTask];
+        
+    }];
+    // Start the long-running task
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        [self.channel invokeMethod:@"prepareToPip" arguments:nil];
+        while (true && self.bgTask != UIBackgroundTaskInvalid) {
+            NSLog(@"后台不停");
+            [self notifyDart:player];
+            [NSThread sleepForTimeInterval:1];
+        }
+        [self notifyDart:player];
+    });
+}
+
+-(void) applicationWillEnterForeground:(UIApplication *)application{
+    UIApplication *app = [UIApplication sharedApplication];
+    [app endBackgroundTask:self.bgTask];
+    if ([_players count] != 1) return;
+    PipFlutter * player = [[_players allValues] lastObject] ;
+    if ([player isPlaying] && [player isPiping]) {
+        [self.channel invokeMethod:@"exitPip" arguments:nil];
+    }
+    self.bgTask = UIBackgroundTaskInvalid;
+}
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
     self = [super init];
     NSAssert(self, @"super init cannot be nil");
@@ -55,7 +121,7 @@ bool _remoteCommandsInitialized = false;
                                    viewIdentifier:(int64_t)viewId
                                         arguments:(id _Nullable)args {
     NSNumber* textureId = [args objectForKey:@"textureId"];
-    PipFlutterView* player = [_players objectForKey:@(textureId.intValue)];
+    PipFlutter* player = [_players objectForKey:@(textureId.intValue)];
     return player;
 }
 
@@ -78,7 +144,13 @@ bool _remoteCommandsInitialized = false;
     [player setMixWithOthers:false];
     [eventChannel setStreamHandler:player];
     player.eventChannel = eventChannel;
+
+    [player setOnBackgroundCountingListener: ^(void){
+        self.bgTask = UIBackgroundTaskInvalid;
+    }];
+
     _players[@(textureId)] = player;
+
     result(@{@"textureId" : @(textureId)});
 }
 
@@ -98,8 +170,8 @@ bool _remoteCommandsInitialized = false;
     if (showNotification){
         [self setRemoteCommandsNotificationActive];
         [self setupRemoteCommands: player];
-        [self setupRemoteCommandNotification: player, title, author, imageUrl];
-        [self setupUpdateListener: player, title, author, imageUrl];
+        [self setupRemoteCommandNotification:player withTitle:title withAuthor:author withImageUrl:imageUrl];
+        [self setupUpdateListener:player withTitle:title withAuthor:author withImageUrl:imageUrl];
     }
 }
 
@@ -173,7 +245,7 @@ bool _remoteCommandsInitialized = false;
     _remoteCommandsInitialized = true;
 }
 
-- (void) setupRemoteCommandNotification:(PipFlutter*)player, NSString* title, NSString* author , NSString* imageUrl{
+- (void) setupRemoteCommandNotification:(PipFlutter*)player withTitle: (NSString*) title withAuthor:(NSString*) author withImageUrl:(NSString*) imageUrl{
     float positionInSeconds = player.position /1000;
     float durationInSeconds = player.duration/ 1000;
 
@@ -232,9 +304,9 @@ bool _remoteCommandsInitialized = false;
     return key;
 }
 
-- (void) setupUpdateListener:(PipFlutter*)player,NSString* title, NSString* author,NSString* imageUrl  {
+- (void) setupUpdateListener:(PipFlutter*)player withTitle:(NSString*) title withAuthor:(NSString*) author withImageUrl:(NSString*) imageUrl  {
     id _timeObserverId = [player.player addPeriodicTimeObserverForInterval:CMTimeMake(1, 1) queue:NULL usingBlock:^(CMTime time){
-        [self setupRemoteCommandNotification:player, title, author, imageUrl];
+        [self setupRemoteCommandNotification:player withTitle:title withAuthor:author withImageUrl:imageUrl];
     }];
 
     NSString* key =  [self getTextureId:player];
@@ -345,6 +417,9 @@ bool _remoteCommandsInitialized = false;
             [player clear];
             [self disposeNotificationData:player];
             [self setRemoteCommandsNotificationNotActive];
+
+            [player setOnBackgroundCountingListener:nil];
+
             [_players removeObjectForKey:@(textureId)];
             // If the Flutter contains https://github.com/flutter/engine/pull/12695,
             // the `player` is disposed via `onTextureUnregistered` at the right time.
@@ -400,8 +475,11 @@ bool _remoteCommandsInitialized = false;
             double top = [argsMap[@"top"] doubleValue];
             double width = [argsMap[@"width"] doubleValue];
             double height = [argsMap[@"height"] doubleValue];
+            NSLog(@"PictureInPicture === >> enablePictureInPicture ===>>%@",[NSString stringWithFormat:@"left:%lf top:%lf width:%lf height:%lf",
+                    left,top,width,height
+                    ]);
             [player enablePictureInPicture:CGRectMake(left, top, width, height)];
-        } else if ([@"isPictureInPictureSupported" isEqualToString:call.method]){
+        }  else if ([@"isPictureInPictureSupported" isEqualToString:call.method]){
             if (@available(iOS 9.0, *)){
                 if ([AVPictureInPictureController isPictureInPictureSupported]){
                     result([NSNumber numberWithBool:true]);

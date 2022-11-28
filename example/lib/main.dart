@@ -1,9 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:pip_flutter/pipflutter_player.dart';
-import 'package:pip_flutter/pipflutter_player_configuration.dart';
-import 'package:pip_flutter/pipflutter_player_controller.dart';
-import 'package:pip_flutter/pipflutter_player_data_source.dart';
-import 'package:pip_flutter/pipflutter_player_data_source_type.dart';
+import 'package:pip_flutter/pipflutter_player_notification_configuration.dart';
 
 void main() {
   runApp(const MyApp());
@@ -51,10 +51,15 @@ class _MyHomePageState extends State<MyHomePage> {
               child: Container(
                 padding: const EdgeInsets.all(8.0),
                 margin: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(color: Colors.pink,borderRadius: BorderRadius.circular(12.0)),
+                decoration: BoxDecoration(
+                    color: Colors.pink,
+                    borderRadius: BorderRadius.circular(12.0)),
                 child: const Text(
                   'Picture in Picture Mode',
-                    style: TextStyle(color: Colors.white,fontWeight: FontWeight.bold,fontSize: 16),
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16),
                 ),
               ),
             ),
@@ -79,15 +84,38 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
     PipFlutterPlayerConfiguration pipFlutterPlayerConfiguration =
         const PipFlutterPlayerConfiguration(
       aspectRatio: 16 / 9,
+      autoPlay: true,
       fit: BoxFit.contain,
     );
-    PipFlutterPlayerDataSource dataSource = PipFlutterPlayerDataSource(
-      PipFlutterPlayerDataSourceType.network,
-      'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+
+    pipFlutterPlayerController = PipFlutterPlayerController(
+        pipFlutterPlayerConfiguration,
+        pipLifeCycleCallback: (open) {
+      print("PictureInPicture === >> fucker pipLifeCycleCallback:$open");
+      if (open) {
+          pipFlutterPlayerController.enablePictureInPicture(pipFlutterPlayerKey);
+      } else {
+        pipFlutterPlayerController.disablePictureInPicture();
+      }
+    },
+        pipInBackgroundCallback: (position,duration){
+          print("PictureInPicture === >>position=>$position duration=>$duration");
+        }
     );
-    pipFlutterPlayerController =
-        PipFlutterPlayerController(pipFlutterPlayerConfiguration);
-    pipFlutterPlayerController.setupDataSource(dataSource);
+    pipFlutterPlayerController.setupDataSource(PipFlutterPlayerDataSource(
+        PipFlutterPlayerDataSourceType.network,
+        'https://sourceqn3.uooconline.com/course900/20210207%E4%BF%AE%E6%94%B9%E4%B8%8A%E4%BC%A0%E6%9B%B4%E6%96%B0/1.3%E5%85%AC%E5%8F%B8%E5%88%B6%E4%BC%81%E4%B8%9A.mp4',
+        // 'http://vfx.mtime.cn/Video/2019/03/09/mp4/190309153658147087.mp4',
+        // 'http://vfx.mtime.cn/Video/2019/02/04/mp4/190204084208765161.mp4',
+        // 'http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4',
+        notificationConfiguration:
+            const PipFlutterPlayerNotificationConfiguration(
+          showNotification: true,
+          title: '漫威流水线展示',
+          author: '漫威宇宙',
+          imageUrl:
+              'https://img0.baidu.com/it/u=248545255,575820690&fm=253&fmt=auto&app=138&f=JPEG',
+        )));
     pipFlutterPlayerController
         .setPipFlutterPlayerGlobalKey(pipFlutterPlayerKey);
     super.initState();
@@ -98,9 +126,14 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Picture in Picture player"),
-        leading: IconButton(onPressed: (){
-          Navigator.of(context).pop();
-        }, icon: const Icon(Icons.arrow_back_ios,color: Colors.white,)),
+        leading: IconButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            icon: const Icon(
+              Icons.arrow_back_ios,
+              color: Colors.white,
+            )),
       ),
       body: Column(
         children: [
@@ -123,11 +156,18 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
               children: [
                 InkWell(
                   child: Container(
-                    width: MediaQuery.of(context).size.width * 0.4,
-                    padding: const EdgeInsets.all(8.0),
+                      width: MediaQuery.of(context).size.width * 0.4,
+                      padding: const EdgeInsets.all(8.0),
                       margin: const EdgeInsets.all(8.0),
-                      decoration: BoxDecoration(color: Colors.pink,borderRadius: BorderRadius.circular(12.0)),
-                      child: const Center(child: Text("Show PiP",style: TextStyle(color: Colors.white,fontWeight: FontWeight.bold),))),
+                      decoration: BoxDecoration(
+                          color: Colors.pink,
+                          borderRadius: BorderRadius.circular(12.0)),
+                      child: const Center(
+                          child: Text(
+                        "Show PiP",
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold),
+                      ))),
                   onTap: () {
                     pipFlutterPlayerController
                         .enablePictureInPicture(pipFlutterPlayerKey);
@@ -138,8 +178,15 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
                       width: MediaQuery.of(context).size.width * 0.4,
                       padding: const EdgeInsets.all(8.0),
                       margin: const EdgeInsets.all(8.0),
-                      decoration: BoxDecoration(color: Colors.pink,borderRadius: BorderRadius.circular(12.0)),
-                      child: Center(child: const Text("Disable PiP",style: TextStyle(color: Colors.white,fontWeight: FontWeight.bold),))),
+                      decoration: BoxDecoration(
+                          color: Colors.pink,
+                          borderRadius: BorderRadius.circular(12.0)),
+                      child: const Center(
+                          child: Text(
+                        "Disable PiP",
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold),
+                      ))),
                   onTap: () async {
                     pipFlutterPlayerController.disablePictureInPicture();
                   },

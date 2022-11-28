@@ -6,7 +6,7 @@ class PipFlutterPlayerBufferingConfiguration {
   static const defaultMinBufferMs = 25000;
   static const defaultMaxBufferMs = 6553600;
   static const defaultBufferForPlaybackMs = 3000;
-  static const defaultBufferForPlaybackAfterRebufferMs = 6000;
+  static const defaultBufferForPlaybackAfterRebuffedMs = 6000;
 
   /// The default minimum duration of media that the player will attempt to
   /// ensure is buffered at all times, in milliseconds.
@@ -23,13 +23,13 @@ class PipFlutterPlayerBufferingConfiguration {
   /// The default duration of media that must be buffered for playback to resume
   /// after a rebuffer, in milliseconds. A rebuffer is defined to be caused by
   /// buffer depletion rather than a user action.
-  final int bufferForPlaybackAfterRebufferMs;
+  final int bufferForPlaybackAfterRebuffedMs;
 
   const PipFlutterPlayerBufferingConfiguration({
     this.minBufferMs = defaultMinBufferMs,
     this.maxBufferMs = defaultMaxBufferMs,
     this.bufferForPlaybackMs = defaultBufferForPlaybackMs,
-    this.bufferForPlaybackAfterRebufferMs =
-        defaultBufferForPlaybackAfterRebufferMs,
+    this.bufferForPlaybackAfterRebuffedMs =
+        defaultBufferForPlaybackAfterRebuffedMs,
   });
 }

@@ -13,69 +13,61 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import com.example.pip_flutter.DataSourceUtils.getUserAgent
-import com.example.pip_flutter.DataSourceUtils.isHTTP
-import com.example.pip_flutter.DataSourceUtils.getDataSourceFactory
-import io.flutter.plugin.common.EventChannel
-import io.flutter.view.TextureRegistry.SurfaceTextureEntry
-import io.flutter.plugin.common.MethodChannel
-import com.google.android.exoplayer2.trackselection.DefaultTrackSelector
-import com.google.android.exoplayer2.ui.PlayerNotificationManager
-import android.support.v4.media.session.MediaSessionCompat
-import com.google.android.exoplayer2.drm.DrmSessionManager
-import androidx.work.WorkManager
-import androidx.work.WorkInfo
-import com.google.android.exoplayer2.drm.HttpMediaDrmCallback
-import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
-import com.google.android.exoplayer2.drm.DefaultDrmSessionManager
-import com.google.android.exoplayer2.drm.FrameworkMediaDrm
-import com.google.android.exoplayer2.drm.UnsupportedDrmException
-import com.google.android.exoplayer2.drm.DummyExoMediaDrm
-import com.google.android.exoplayer2.drm.LocalMediaDrmCallback
-import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
-import com.google.android.exoplayer2.source.MediaSource
-import com.google.android.exoplayer2.source.ClippingMediaSource
-import com.google.android.exoplayer2.ui.PlayerNotificationManager.MediaDescriptionAdapter
-import com.google.android.exoplayer2.ui.PlayerNotificationManager.BitmapCallback
-import androidx.work.OneTimeWorkRequest
-import android.support.v4.media.session.PlaybackStateCompat
 import android.support.v4.media.MediaMetadataCompat
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
 import android.view.Surface
 import androidx.lifecycle.Observer
-import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource
-import com.google.android.exoplayer2.source.smoothstreaming.DefaultSsChunkSource
+import androidx.media.session.MediaButtonReceiver
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import com.example.pip_flutter.DataSourceUtils.getDataSourceFactory
+import com.example.pip_flutter.DataSourceUtils.getUserAgent
+import com.example.pip_flutter.DataSourceUtils.isHTTP
+import com.google.android.exoplayer2.*
+import com.google.android.exoplayer2.C.TRACK_TYPE_AUDIO
+import com.google.android.exoplayer2.audio.AudioAttributes
+import com.google.android.exoplayer2.drm.*
+import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
+import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory
+import com.google.android.exoplayer2.source.ClippingMediaSource
+import com.google.android.exoplayer2.source.MediaSource
+import com.google.android.exoplayer2.source.ProgressiveMediaSource
 import com.google.android.exoplayer2.source.dash.DashMediaSource
 import com.google.android.exoplayer2.source.dash.DefaultDashChunkSource
 import com.google.android.exoplayer2.source.hls.HlsMediaSource
-import com.google.android.exoplayer2.source.ProgressiveMediaSource
-import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory
-import io.flutter.plugin.common.EventChannel.EventSink
-import androidx.media.session.MediaButtonReceiver
-import androidx.work.Data
-import com.example.pictureinpicture_flutterplayer.QueuingEventSink
-import com.google.android.exoplayer2.*
-import com.google.android.exoplayer2.audio.AudioAttributes
-import com.google.android.exoplayer2.drm.DrmSessionManagerProvider
-import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
-import com.google.android.exoplayer2.trackselection.DefaultTrackSelector.SelectionOverride
+import com.google.android.exoplayer2.source.smoothstreaming.DefaultSsChunkSource
+import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource
+import com.google.android.exoplayer2.trackselection.DefaultTrackSelector
+import com.google.android.exoplayer2.trackselection.TrackSelectionOverride
+import com.google.android.exoplayer2.ui.PlayerNotificationManager
+import com.google.android.exoplayer2.ui.PlayerNotificationManager.BitmapCallback
+import com.google.android.exoplayer2.ui.PlayerNotificationManager.MediaDescriptionAdapter
 import com.google.android.exoplayer2.upstream.DataSource
+import com.google.android.exoplayer2.upstream.DefaultDataSource
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
 import com.google.android.exoplayer2.util.Util
+import io.flutter.plugin.common.EventChannel
+import io.flutter.plugin.common.EventChannel.EventSink
+import io.flutter.plugin.common.MethodChannel
+import io.flutter.view.TextureRegistry.SurfaceTextureEntry
 import java.io.File
-import java.lang.Exception
-import java.lang.IllegalStateException
 import java.util.*
 import kotlin.math.max
 import kotlin.math.min
 
+
 internal class PipFlutterPlayer(
-        context: Context,
-        private val eventChannel: EventChannel,
-        private val textureEntry: SurfaceTextureEntry,
-        customDefaultLoadControl: CustomDefaultLoadControl?,
-        result: MethodChannel.Result
+    context: Context,
+    private val eventChannel: EventChannel,
+    private val textureEntry: SurfaceTextureEntry,
+    customDefaultLoadControl: CustomDefaultLoadControl?,
+    result: MethodChannel.Result
 ) {
-    private val exoPlayer: SimpleExoPlayer?
+    private val exoPlayer: ExoPlayer?
     private val eventSink = QueuingEventSink()
     private val trackSelector: DefaultTrackSelector = DefaultTrackSelector(context)
     private val loadControl: LoadControl
@@ -104,7 +96,7 @@ internal class PipFlutterPlayer(
             this.customDefaultLoadControl.bufferForPlaybackAfterRebufferMs
         )
         loadControl = loadBuilder.build()
-        exoPlayer = SimpleExoPlayer.Builder(context)
+        exoPlayer = ExoPlayer.Builder(context)//;SimpleExoPlayer.Builder(context)
             .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
             .build()
@@ -132,7 +124,7 @@ internal class PipFlutterPlayer(
         this.key = key
         isInitialized = false
         val uri = Uri.parse(dataSource)
-        var dataSourceFactory: DataSource.Factory?
+        var dataSourceFactory: DataSource.Factory
         val userAgent = getUserAgent(headers)
         if (licenseUrl != null && licenseUrl.isNotEmpty()) {
             val httpMediaDrmCallback =
@@ -190,7 +182,10 @@ internal class PipFlutterPlayer(
                 )
             }
         } else {
-            dataSourceFactory = DefaultDataSourceFactory(context, userAgent)
+            dataSourceFactory = DefaultDataSource.Factory(
+                context,
+                DefaultHttpDataSource.Factory().setUserAgent(userAgent)
+            )
         }
         val mediaSource = buildMediaSource(uri, dataSourceFactory, formatHint, cacheKey, context)
         if (overriddenDuration != 0L) {
@@ -213,7 +208,7 @@ internal class PipFlutterPlayer(
                 return title
             }
 
-            @SuppressLint("UnspecifiedImmutableFlag")
+            @SuppressLint("UnspecifiedImmutableFlag", "InlinedApi")
             override fun createCurrentContentIntent(player: Player): PendingIntent? {
                 val packageName = context.applicationContext.packageName
                 val notificationIntent = Intent()
@@ -225,9 +220,9 @@ internal class PipFlutterPlayer(
                         or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 return PendingIntent.getActivity(
                     context, 0,
-                    notificationIntent,
-                    PendingIntent.FLAG_IMMUTABLE
+                    notificationIntent, PendingIntent.FLAG_IMMUTABLE
                 )
+
             }
 
             override fun getCurrentContentText(player: Player): String? {
@@ -286,8 +281,7 @@ internal class PipFlutterPlayer(
                 return null
             }
         }
-        var playerNotificationChannelName = notificationChannelName
-        if (notificationChannelName == null) {
+        val playerNotificationChannelName: String = notificationChannelName ?: run {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val importance = NotificationManager.IMPORTANCE_LOW
                 val channel = NotificationChannel(
@@ -299,22 +293,27 @@ internal class PipFlutterPlayer(
                     NotificationManager::class.java
                 )
                 notificationManager.createNotificationChannel(channel)
-                playerNotificationChannelName = DEFAULT_NOTIFICATION_CHANNEL
+                return@run DEFAULT_NOTIFICATION_CHANNEL
+            } else {
+                return@run ""
             }
         }
-        playerNotificationManager = PlayerNotificationManager.Builder(
-            context,
-            NOTIFICATION_ID,
-            playerNotificationChannelName!!,
-            mediaDescriptionAdapter
-        ).build()
-        playerNotificationManager!!.setPlayer(exoPlayer)
-        playerNotificationManager!!.setUseNextAction(false)
-        playerNotificationManager!!.setUsePreviousAction(false)
-        playerNotificationManager!!.setUseStopAction(false)
+
         val mediaSession = setupMediaSession(context, false)
-        playerNotificationManager!!.setMediaSessionToken(mediaSession.sessionToken)
-        playerNotificationManager!!.setControlDispatcher(setupControlDispatcher())
+        playerNotificationManager = PlayerNotificationManager.Builder(
+            context, NOTIFICATION_ID,
+            playerNotificationChannelName
+        ).apply {
+            setMediaDescriptionAdapter(mediaDescriptionAdapter)
+        }.build().apply {
+            setUseNextAction(false)
+            setUsePreviousAction(false)
+            setUseStopAction(false)
+            setMediaSessionToken(mediaSession.sessionToken)
+            setPlayer(setupControlDispatcher2(exoPlayer!!))
+//            setControlDispatcher(setupControlDispatcher())
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             refreshHandler = Handler(Looper.getMainLooper())
             refreshRunnable = Runnable {
@@ -347,7 +346,64 @@ internal class PipFlutterPlayer(
         exoPlayer.seekTo(0)
     }
 
-    private fun setupControlDispatcher(): ControlDispatcher {
+
+    private fun setupControlDispatcher2(player: ExoPlayer): ForwardingPlayer {
+        val forwardingPlayer = object : ForwardingPlayer(player) {
+            override fun isCommandAvailable(command: Int): Boolean {
+                if (
+                    command == COMMAND_SET_SHUFFLE_MODE||
+                    command == COMMAND_SET_REPEAT_MODE||
+                    command == COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM
+                ) {
+                    return false;
+                }
+                return super.isCommandAvailable(command);
+            }
+
+            override fun getAvailableCommands(): Player.Commands {
+                return super.getAvailableCommands()
+                    .buildUpon()
+                    .remove(COMMAND_SET_SHUFFLE_MODE)
+                    .remove(COMMAND_SET_REPEAT_MODE)
+//                    .remove(COMMAND_SEEK_TO_PREVIOUS)
+                    .remove(COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                    .build()
+            }
+        }.apply {
+            addListener(object : Player.Listener {
+                override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                    super.onPlayWhenReadyChanged(playWhenReady, reason)
+                    ///TODO 视频流准备好时自动触发暂停和播放,看不懂是什么鬼操作
+                    /*if (playWhenReady) {
+                        sendEvent("pause")
+                    } else {
+                        sendEvent("play")
+                    }*/
+                }
+
+                override fun onSeekBackIncrementChanged(seekBackIncrementMs: Long) {
+                    super.onSeekBackIncrementChanged(seekBackIncrementMs)
+                    sendSeekToEvent(player.currentPosition - 5000)
+                }
+
+                override fun onSeekForwardIncrementChanged(seekForwardIncrementMs: Long) {
+                    super.onSeekForwardIncrementChanged(seekForwardIncrementMs)
+//                    sendSeekToEvent(seekForwardIncrementMs)
+                    sendSeekToEvent(player.currentPosition + 5000)
+                }
+
+
+                override fun onMaxSeekToPreviousPositionChanged(maxSeekToPreviousPositionMs: Long) {
+                    super.onMaxSeekToPreviousPositionChanged(maxSeekToPreviousPositionMs)
+                }
+
+            })
+        }
+        return forwardingPlayer
+    }
+
+
+    /*private fun setupControlDispatcher(): ControlDispatcher {
         return object : ControlDispatcher {
             override fun dispatchPrepare(player: Player): Boolean {
                 return false
@@ -420,7 +476,7 @@ internal class PipFlutterPlayer(
             }
         }
     }
-
+*/
     fun disposeRemoteNotifications() {
         if (exoPlayerEventListener != null) {
             exoPlayer!!.removeListener(exoPlayerEventListener!!)
@@ -449,13 +505,13 @@ internal class PipFlutterPlayer(
             if (lastPathSegment == null) {
                 lastPathSegment = ""
             }
-            type = Util.inferContentType(lastPathSegment)
+            type = Util.inferContentTypeForExtension(lastPathSegment)
         } else {
             type = when (formatHint) {
-                FORMAT_SS -> C.TYPE_SS
-                FORMAT_DASH -> C.TYPE_DASH
-                FORMAT_HLS -> C.TYPE_HLS
-                FORMAT_OTHER -> C.TYPE_OTHER
+                FORMAT_SS -> C.CONTENT_TYPE_SS
+                FORMAT_DASH -> C.CONTENT_TYPE_DASH
+                FORMAT_HLS -> C.CONTENT_TYPE_HLS
+                FORMAT_OTHER -> C.CONTENT_TYPE_OTHER
                 else -> -1
             }
         }
@@ -469,32 +525,58 @@ internal class PipFlutterPlayer(
         if (drmSessionManager != null) {
             drmSessionManagerProvider = DrmSessionManagerProvider { drmSessionManager!! }
         }
-        return when (type) {
-            C.TYPE_SS -> SsMediaSource.Factory(
-                DefaultSsChunkSource.Factory(mediaDataSourceFactory),
-                DefaultDataSourceFactory(context, null, mediaDataSourceFactory)
-            )
-                .setDrmSessionManagerProvider(drmSessionManagerProvider)
-                .createMediaSource(mediaItem)
-            C.TYPE_DASH -> DashMediaSource.Factory(
-                DefaultDashChunkSource.Factory(mediaDataSourceFactory),
-                DefaultDataSourceFactory(context, null, mediaDataSourceFactory)
-            )
-                .setDrmSessionManagerProvider(drmSessionManagerProvider)
-                .createMediaSource(mediaItem)
-            C.TYPE_HLS -> HlsMediaSource.Factory(mediaDataSourceFactory)
-                .setDrmSessionManagerProvider(drmSessionManagerProvider)
-                .createMediaSource(mediaItem)
-            C.TYPE_OTHER -> ProgressiveMediaSource.Factory(
-                mediaDataSourceFactory,
-                DefaultExtractorsFactory()
-            )
-                .setDrmSessionManagerProvider(drmSessionManagerProvider)
-                .createMediaSource(mediaItem)
-            else -> {
-                throw IllegalStateException("Unsupported type: $type")
+        if (drmSessionManagerProvider != null) {
+            return when (type) {
+                C.CONTENT_TYPE_SS -> SsMediaSource.Factory(
+                    DefaultSsChunkSource.Factory(mediaDataSourceFactory),
+                    DefaultDataSource.Factory(context, mediaDataSourceFactory)
+                )
+                    .setDrmSessionManagerProvider(drmSessionManagerProvider)
+                    .createMediaSource(mediaItem)
+                C.CONTENT_TYPE_DASH -> DashMediaSource.Factory(
+                    DefaultDashChunkSource.Factory(mediaDataSourceFactory),
+                    DefaultDataSource.Factory(context, mediaDataSourceFactory)
+                )
+                    .setDrmSessionManagerProvider(drmSessionManagerProvider)
+                    .createMediaSource(mediaItem)
+                C.CONTENT_TYPE_HLS -> HlsMediaSource.Factory(mediaDataSourceFactory)
+                    .setDrmSessionManagerProvider(drmSessionManagerProvider)
+                    .createMediaSource(mediaItem)
+                C.CONTENT_TYPE_OTHER -> ProgressiveMediaSource.Factory(
+                    mediaDataSourceFactory,
+                    DefaultExtractorsFactory()
+                )
+                    .setDrmSessionManagerProvider(drmSessionManagerProvider)
+                    .createMediaSource(mediaItem)
+                else -> {
+                    throw IllegalStateException("Unsupported type: $type")
+                }
+            }
+        } else {
+            return when (type) {
+                C.CONTENT_TYPE_SS -> SsMediaSource.Factory(
+                    DefaultSsChunkSource.Factory(mediaDataSourceFactory),
+                    DefaultDataSource.Factory(context, mediaDataSourceFactory)
+                )
+                    .createMediaSource(mediaItem)
+                C.CONTENT_TYPE_DASH -> DashMediaSource.Factory(
+                    DefaultDashChunkSource.Factory(mediaDataSourceFactory),
+                    DefaultDataSource.Factory(context, mediaDataSourceFactory)
+                )
+                    .createMediaSource(mediaItem)
+                C.CONTENT_TYPE_HLS -> HlsMediaSource.Factory(mediaDataSourceFactory)
+                    .createMediaSource(mediaItem)
+                C.CONTENT_TYPE_OTHER -> ProgressiveMediaSource.Factory(
+                    mediaDataSourceFactory,
+                    DefaultExtractorsFactory()
+                )
+                    .createMediaSource(mediaItem)
+                else -> {
+                    throw IllegalStateException("Unsupported type: $type")
+                }
             }
         }
+
     }
 
     private fun setupVideoPlayer(
@@ -565,43 +647,48 @@ internal class PipFlutterPlayer(
         }
     }
 
-    private fun setAudioAttributes(exoPlayer: SimpleExoPlayer?, mixWithOthers: Boolean) {
-        val audioComponent = exoPlayer!!.audioComponent ?: return
+    private fun setAudioAttributes(exoPlayer: ExoPlayer?, mixWithOthers: Boolean) {
+        exoPlayer ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            audioComponent.setAudioAttributes(
-                AudioAttributes.Builder().setContentType(C.CONTENT_TYPE_MOVIE).build(),
+            exoPlayer.setAudioAttributes(
+                AudioAttributes.Builder().setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),
                 !mixWithOthers
             )
         } else {
-            audioComponent.setAudioAttributes(
-                AudioAttributes.Builder().setContentType(C.CONTENT_TYPE_MUSIC).build(),
+            exoPlayer.setAudioAttributes(
+                AudioAttributes.Builder().setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
                 !mixWithOthers
             )
         }
     }
 
     fun play() {
-        exoPlayer!!.playWhenReady = true
+        exoPlayer?.playWhenReady = true
     }
 
     fun pause() {
-        exoPlayer!!.playWhenReady = false
+        exoPlayer?.playWhenReady = false
     }
 
+    fun isPlaying(): Boolean {
+       return (exoPlayer?.isPlaying ?: false)// || (exoPlayer?.isLoading ?: false)
+    }
+
+
     fun setLooping(value: Boolean) {
-        exoPlayer!!.repeatMode = if (value) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
+        exoPlayer?.repeatMode = if (value) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
     }
 
     fun setVolume(value: Double) {
         val bracketedValue = max(0.0, min(1.0, value))
             .toFloat()
-        exoPlayer!!.volume = bracketedValue
+        exoPlayer?.volume = bracketedValue
     }
 
     fun setSpeed(value: Double) {
         val bracketedValue = value.toFloat()
         val playbackParameters = PlaybackParameters(bracketedValue)
-        exoPlayer!!.playbackParameters = playbackParameters
+        exoPlayer?.playbackParameters = playbackParameters
     }
 
     fun setTrackParameters(width: Int, height: Int, bitrate: Int) {
@@ -620,21 +707,24 @@ internal class PipFlutterPlayer(
     }
 
     fun seekTo(location: Int) {
-        exoPlayer!!.seekTo(location.toLong())
+        exoPlayer?.seekTo(location.toLong())
     }
 
     val position: Long
-        get() = exoPlayer!!.currentPosition
+        get() = exoPlayer?.currentPosition ?: 0
     val absolutePosition: Long
         get() {
-            val timeline = exoPlayer!!.currentTimeline
-            if (!timeline.isEmpty) {
+            val timeline = exoPlayer?.currentTimeline
+            if (timeline != null && !timeline.isEmpty) {
                 val windowStartTimeMs = timeline.getWindow(0, Timeline.Window()).windowStartTimeMs
-                val pos = exoPlayer.currentPosition
+                val pos = exoPlayer!!.currentPosition
                 return windowStartTimeMs + pos
             }
-            return exoPlayer.currentPosition
+            return exoPlayer?.currentPosition ?: 0
         }
+
+    val duration:Long
+    get() = getDuration()
 
     private fun sendInitialized() {
         if (isInitialized) {
@@ -642,7 +732,7 @@ internal class PipFlutterPlayer(
             event["event"] = "initialized"
             event["key"] = key
             event["duration"] = getDuration()
-            if (exoPlayer!!.videoFormat != null) {
+            if (exoPlayer?.videoFormat != null) {
                 val videoFormat = exoPlayer.videoFormat
                 var width = videoFormat!!.width
                 var height = videoFormat.height
@@ -659,7 +749,8 @@ internal class PipFlutterPlayer(
         }
     }
 
-    private fun getDuration(): Long = exoPlayer!!.duration
+    @JvmName("getDuration1")
+    protected fun getDuration(): Long = exoPlayer?.duration ?: 0
 
     /**
      * Create media session which will be used in notifications, pip mode.
@@ -668,16 +759,25 @@ internal class PipFlutterPlayer(
      * @param setupControlDispatcher - should add control dispatcher to created MediaSession
      * @return - configured MediaSession instance
      */
+    @SuppressLint("UnspecifiedImmutableFlag")
     fun setupMediaSession(context: Context?, setupControlDispatcher: Boolean): MediaSessionCompat {
         mediaSession?.release()
-        val mediaButtonReceiver = ComponentName(context!!, MediaButtonReceiver::class.java)
+        ComponentName(context!!, MediaButtonReceiver::class.java) //val _mediaButtonReceiver =
         val mediaButtonIntent = Intent(Intent.ACTION_MEDIA_BUTTON)
-        val pendingIntent = PendingIntent.getBroadcast(
-            context!!,
-            0, mediaButtonIntent,
-            PendingIntent.FLAG_IMMUTABLE
-        )
-        val mediaSession = MediaSessionCompat(context!!, TAG, null, pendingIntent)
+        val pendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.getBroadcast(
+                context,
+                0, mediaButtonIntent,
+                PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            PendingIntent.getBroadcast(
+                context,
+                0, mediaButtonIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT
+            )
+        }
+        val mediaSession = MediaSessionCompat(context, TAG, null, pendingIntent)
         mediaSession.setCallback(object : MediaSessionCompat.Callback() {
             override fun onSeekTo(pos: Long) {
                 sendSeekToEvent(pos)
@@ -686,10 +786,15 @@ internal class PipFlutterPlayer(
         })
         mediaSession.isActive = true
         val mediaSessionConnector = MediaSessionConnector(mediaSession)
-        if (setupControlDispatcher) {
+        /*if (setupControlDispatcher) {
             mediaSessionConnector.setControlDispatcher(setupControlDispatcher())
-        }
-        mediaSessionConnector.setPlayer(exoPlayer)
+        }*/
+        //TODO
+//        if(setupControlDispatcher){
+//            mediaSessionConnector.setPlayer(setupControlDispatcher2(exoPlayer!!))
+//        }else{
+            mediaSessionConnector.setPlayer(exoPlayer)
+//        }
         this.mediaSession = mediaSession
         return mediaSession
     }
@@ -697,13 +802,17 @@ internal class PipFlutterPlayer(
     fun onPictureInPictureStatusChanged(inPip: Boolean) {
         val event: MutableMap<String, Any> = HashMap()
         event["event"] = if (inPip) "pipStart" else "pipStop"
+        isPip = inPip
         eventSink.success(event)
+    }
+    private var isPip=false
+    fun isPiping(): Boolean {
+        Log.wtf("fucker isPiping()","isPip:$isPip")
+        return isPip
     }
 
     fun disposeMediaSession() {
-        if (mediaSession != null) {
-            mediaSession!!.release()
-        }
+        mediaSession?.release()
         mediaSession = null
     }
 
@@ -718,7 +827,7 @@ internal class PipFlutterPlayer(
             val mappedTrackInfo = trackSelector.currentMappedTrackInfo
             if (mappedTrackInfo != null) {
                 for (rendererIndex in 0 until mappedTrackInfo.rendererCount) {
-                    if (mappedTrackInfo.getRendererType(rendererIndex) != C.TRACK_TYPE_AUDIO) {
+                    if (mappedTrackInfo.getRendererType(rendererIndex) != TRACK_TYPE_AUDIO) {
                         continue
                     }
                     val trackGroupArray = mappedTrackInfo.getTrackGroups(rendererIndex)
@@ -764,18 +873,27 @@ internal class PipFlutterPlayer(
         }
     }
 
-    private fun setAudioTrack(rendererIndex: Int, groupIndex: Int, groupElementIndex: Int) {
+    private fun setAudioTrack(rendererIndex: Int, groupIndex: Int, trackIndex: Int) {
         val mappedTrackInfo = trackSelector.currentMappedTrackInfo
         if (mappedTrackInfo != null) {
             val builder = trackSelector.parameters.buildUpon()
-            builder.clearSelectionOverrides(rendererIndex)
+            builder.clearOverridesOfType(TRACK_TYPE_AUDIO)
                 .setRendererDisabled(rendererIndex, false)
-            val tracks = intArrayOf(groupElementIndex)
-            val override = SelectionOverride(groupIndex, *tracks)
-            builder.setSelectionOverride(
+//            builder.clearSelectionOverrides(rendererIndex)
+            /* val tracks = intArrayOf(groupElementIndex)
+             val override = SelectionOverride(groupIndex, *tracks)*/
+
+            builder.addOverride(
+                TrackSelectionOverride(
+                    mappedTrackInfo.getTrackGroups(rendererIndex).get(groupIndex),
+                    trackIndex
+                )
+            )
+
+            /*builder.setSelectionOverride(
                 rendererIndex,
                 mappedTrackInfo.getTrackGroups(rendererIndex), override
-            )
+            )*/
             trackSelector.setParameters(builder)
         }
     }
@@ -796,13 +914,11 @@ internal class PipFlutterPlayer(
         disposeMediaSession()
         disposeRemoteNotifications()
         if (isInitialized) {
-            exoPlayer!!.stop()
+            exoPlayer?.stop()
         }
         textureEntry.release()
         eventChannel.setStreamHandler(null)
-        if (surface != null) {
-            surface!!.release()
-        }
+        surface?.release()
         exoPlayer?.release()
     }
 
@@ -830,9 +946,9 @@ internal class PipFlutterPlayer(
         private const val NOTIFICATION_ID = 20772077
 
         //Clear cache without accessing PipFlutterPlayerCache.
-        fun clearCache(context: Context, result: MethodChannel.Result) {
+        fun clearCache(context: Context?, result: MethodChannel.Result) {
             try {
-                val file = File(context.cacheDir, "pipFlutterPlayerCache")
+                val file = File(context?.cacheDir ?: return, "pipFlutterPlayerCache")
                 deleteDirectory(file)
                 result.success(null)
             } catch (exception: Exception) {
@@ -885,7 +1001,7 @@ internal class PipFlutterPlayer(
         //Stop pre cache of video with given url. If there's no work manager job for given url, then
         //it will be ignored.
         fun stopPreCache(context: Context?, url: String?, result: MethodChannel.Result) {
-            WorkManager.getInstance(context!!).cancelAllWorkByTag(url!!)
+            WorkManager.getInstance(context ?: return).cancelAllWorkByTag(url ?: return)
             result.success(null)
         }
     }

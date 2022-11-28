@@ -165,10 +165,14 @@ class VideoPlayerValue {
 class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   final PipFlutterPlayerBufferingConfiguration bufferingConfiguration;
 
+  VideoPipLifeCycleCallback? pipLifeCycleCallback;
+  VideoPipInBackgroundCallback? pipInBackgroundCallback;
   /// Constructs a [VideoPlayerController] and creates video controller on platform side.
   VideoPlayerController({
     this.bufferingConfiguration =
         const PipFlutterPlayerBufferingConfiguration(),
+    this.pipLifeCycleCallback,
+    this.pipInBackgroundCallback,
     bool autoCreate = true,
   }) : super(VideoPlayerValue(duration: null)) {
     if (autoCreate) {
@@ -214,9 +218,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           value = value.copyWith(
             duration: event.duration,
             size: event.size,
+            // isPlaying: true
           );
           _initializingCompleter.complete(null);
-          _applyPlayPause();
+          _applyPlayPause(); //TODO 自动播放
           break;
         case VideoEventType.completed:
           value = value.copyWith(isPlaying: false, position: value.duration);
@@ -235,10 +240,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           break;
 
         case VideoEventType.play:
-          play();
+          play();//TODO check this !!!!
           break;
         case VideoEventType.pause:
-          pause();
+          pause();//TODO check this !!!!
           break;
         case VideoEventType.seek:
           seekTo(event.position);
@@ -270,6 +275,9 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     _eventSubscription = _videoPlayerPlatform
         .videoEventsFor(_textureId)
         .listen(eventListener, onError: errorListener);
+
+    VideoPlayerPlatform.instance.setPipLifeCycleCallback(pipLifeCycleCallback);
+    VideoPlayerPlatform.instance.setPipInBackgroundCallback(pipInBackgroundCallback);
   }
 
   /// Set data source for playing a video from an asset.
@@ -417,6 +425,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       await _eventSubscription?.cancel();
       await _videoPlayerPlatform.dispose(_textureId);
       videoEventStreamController.close();
+      pipLifeCycleCallback=null;
+      pipInBackgroundCallback=null;
+      VideoPlayerPlatform.instance.setPipLifeCycleCallback(null);
+      VideoPlayerPlatform.instance.setPipInBackgroundCallback(null);
     }
     _isDisposed = true;
     super.dispose();
@@ -453,11 +465,18 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   }
 
   Future<void> _applyPlayPause() async {
+    print("_applyPlayPause stack:::${StackTrace.current}");
     if (!_created || _isDisposed) {
       return;
     }
-    _timer?.cancel();
-    if (value.isPlaying) {
+    bool firstApply=false;
+    if(_timer!=null){
+      _timer?.cancel();
+    }else{
+      firstApply=true;
+    }
+    //firstApply ||
+    if ((value.isPlaying)) {
       await _videoPlayerPlatform.play(_textureId);
       _timer = Timer.periodic(
         const Duration(milliseconds: 300),
@@ -591,6 +610,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     await _videoPlayerPlatform.enablePictureInPicture(
         textureId, top, left, width, height);
   }
+
 
   Future<void> disablePictureInPicture() async {
     await _videoPlayerPlatform.disablePictureInPicture(textureId);

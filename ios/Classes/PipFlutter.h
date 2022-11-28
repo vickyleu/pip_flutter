@@ -23,6 +23,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic) CGAffineTransform preferredTransform;
 @property(nonatomic, readonly) bool disposed;
 @property(nonatomic, readonly) bool isPlaying;
+@property(nonatomic, readonly) bool isPiping;
 @property(nonatomic) bool isLooping;
 @property(nonatomic, readonly) bool isInitialized;
 @property(nonatomic, readonly) NSString* key;
@@ -52,6 +53,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void) setAudioTrack:(NSString*) name index:(int) index;
 - (void)setTrackParameters:(int) width: (int) height: (int)bitrate;
 - (void) enablePictureInPicture: (CGRect) frame;
+
 - (void)setPictureInPicture:(BOOL)pictureInPicture;
 - (void)disablePictureInPicture;
 - (int64_t)absolutePosition;
@@ -60,6 +62,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)clear;
 - (void)disposeSansEventChannel;
 - (void)dispose;
+
+- (void)setOnBackgroundCountingListener:(void (^)(void))pFunction;
 @end
 
 NS_ASSUME_NONNULL_END

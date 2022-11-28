@@ -15,4 +15,6 @@
 @property(readonly, strong, nonatomic) NSMutableDictionary* players;
 @property(readonly, strong, nonatomic) NSObject<FlutterPluginRegistrar>* registrar;
 
++(instancetype) shareInstance;
+- (void)viewWillDisappear;
 @end

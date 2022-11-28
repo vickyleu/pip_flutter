@@ -70,9 +70,11 @@ class PipFlutterPlayerController {
 
   ///Flag used to store full screen mode state.
   bool _isFullScreen = false;
+  bool _isPiping = false;
 
   ///Flag used to store full screen mode state.
   bool get isFullScreen => _isFullScreen;
+  bool get isPiping => _isPiping;
 
   ///Time when last progress event was sent
   int _lastPositionSelection = 0;
@@ -222,10 +224,16 @@ class PipFlutterPlayerController {
   ///Currently displayed [PipFlutterPlayerSubtitle].
   PipFlutterPlayerSubtitle? renderedSubtitle;
 
+
+  VideoPipLifeCycleCallback? pipLifeCycleCallback;
+  VideoPipInBackgroundCallback? pipInBackgroundCallback;
+
   PipFlutterPlayerController(
     this.pipFlutterPlayerConfiguration, {
     this.pipFlutterPlayerPlaylistConfiguration,
     PipFlutterPlayerDataSource? pipFlutterPlayerDataSource,
+    this.pipLifeCycleCallback,
+    this.pipInBackgroundCallback,
   }) {
     _eventListeners.add(eventListener);
     if (pipFlutterPlayerDataSource != null) {
@@ -259,7 +267,10 @@ class PipFlutterPlayerController {
     if (videoPlayerController == null) {
       videoPlayerController = VideoPlayerController(
           bufferingConfiguration:
-              pipFlutterPlayerDataSource.bufferingConfiguration);
+              pipFlutterPlayerDataSource.bufferingConfiguration,
+          pipLifeCycleCallback:pipLifeCycleCallback,
+          pipInBackgroundCallback:pipInBackgroundCallback,
+      );
       videoPlayerController?.addListener(_onVideoPlayerChanged);
     }
 
@@ -943,8 +954,14 @@ class PipFlutterPlayerController {
         }));
 
     videoPlayerController!
-        .setTrackParameters(track.width, track.height, track.bitrate);
+        .setTrackParameters(track.width, track.height, track.bitrate).then((value){
+
+      videoPlayerController!.play();
+      videoPlayerController!.refresh();
+    });
     _pipFlutterPlayerAsmsTrack = track;
+
+    // _applyPlayPause();
   }
 
   ///Check if player can be played/paused automatically
@@ -1097,7 +1114,9 @@ class PipFlutterPlayerController {
         _wasInFullScreenBeforePiP = _isFullScreen;
         await videoPlayerController?.enablePictureInPicture(
             left: 0, top: 0, width: 0, height: 0);
-        enterFullScreen();
+        if(!_isFullScreen){
+          enterFullScreen();
+        }
         _postEvent(PipFlutterPlayerEvent(PipFlutterPlayerEventType.pipStart));
         return;
       }
@@ -1133,6 +1152,7 @@ class PipFlutterPlayerController {
     if (videoPlayerController == null) {
       throw StateError("The data source has not been initialized");
     }
+    videoPlayerController!.refresh();
     return videoPlayerController!.disablePictureInPicture();
   }
 
@@ -1309,6 +1329,8 @@ class PipFlutterPlayerController {
       return;
     }
     if (!_disposed) {
+      pipLifeCycleCallback=null;
+      pipInBackgroundCallback=null;
       if (videoPlayerController != null) {
         pause();
         videoPlayerController!.removeListener(_onFullScreenStateChanged);

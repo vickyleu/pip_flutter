@@ -2,19 +2,19 @@ package com.example.pip_flutter
 
 import android.content.Context
 import com.google.android.exoplayer2.upstream.DataSource
-import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
-import com.google.android.exoplayer2.upstream.cache.CacheDataSource
+import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter
+import com.google.android.exoplayer2.upstream.DefaultDataSource
 import com.google.android.exoplayer2.upstream.FileDataSource
 import com.google.android.exoplayer2.upstream.cache.CacheDataSink
-import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter
+import com.google.android.exoplayer2.upstream.cache.CacheDataSource
 
 internal class CacheDataSourceFactory(
     private val context: Context,
     private val maxCacheSize: Long,
     private val maxFileSize: Long,
-    upstreamDataSource: DataSource.Factory?
+    upstreamDataSource: DataSource.Factory
 ) : DataSource.Factory {
-    private val defaultDatasourceFactory: DefaultDataSourceFactory
+    private val defaultDatasourceFactory: DefaultDataSource.Factory
     override fun createDataSource(): CacheDataSource {
         val pipFlutterPlayerCache = PipFlutterPlayerCache.createCache(context, maxCacheSize)
             ?: throw IllegalStateException("Cache can't be null.")
@@ -31,7 +31,8 @@ internal class CacheDataSourceFactory(
 
     init {
         val bandwidthMeter = DefaultBandwidthMeter.Builder(context).build()
-        defaultDatasourceFactory =
-            DefaultDataSourceFactory(context, bandwidthMeter, upstreamDataSource!!)
+        defaultDatasourceFactory = DefaultDataSource.Factory(context, upstreamDataSource).apply {
+            setTransferListener(bandwidthMeter)
+        }
     }
 }

@@ -5,6 +5,9 @@ import 'package:flutter/widgets.dart';
 import 'package:pip_flutter/pipflutter_player_buffering_configuration.dart';
 import 'method_channel_video_player.dart';
 
+
+typedef VideoPipLifeCycleCallback= void Function(bool isShouldOpenPip);
+typedef VideoPipInBackgroundCallback= void Function(int position,int duration);
 /// The interface that implementations of video_player must implement.
 ///
 /// Platform implementations should extend this class rather than implement it as `video_player`
@@ -20,6 +23,25 @@ abstract class VideoPlayerPlatform {
   /// skip the verification that the class isn't implemented with `implements`.
   @visibleForTesting
   bool get isMock => false;
+
+
+  VideoPipLifeCycleCallback? _pipLifeCycleCallback;
+  VideoPipInBackgroundCallback? _pipInBackgroundCallback;
+
+
+
+  void setPipLifeCycleCallback(VideoPipLifeCycleCallback? pipLifeCycleCallback){
+    _pipLifeCycleCallback=pipLifeCycleCallback;
+  }
+  void setPipInBackgroundCallback(VideoPipInBackgroundCallback? pipInBackgroundCallback){
+    _pipInBackgroundCallback=pipInBackgroundCallback;
+  }
+
+  VideoPipLifeCycleCallback? get  pipLifeCycleCallback=>_pipLifeCycleCallback;
+  VideoPipInBackgroundCallback? get  pipInBackgroundCallback=>_pipInBackgroundCallback;
+
+
+
 
   static VideoPlayerPlatform _instance = MethodChannelVideoPlayer();
 
@@ -137,6 +159,8 @@ abstract class VideoPlayerPlatform {
     throw UnimplementedError(
         'enablePictureInPicture() has not been implemented.');
   }
+
+
 
   ///Disables PiP mode.
   Future<void> disablePictureInPicture(int? textureId) {

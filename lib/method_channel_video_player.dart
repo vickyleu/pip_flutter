@@ -16,6 +16,8 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
     return _channel.invokeMethod<void>('init');
   }
 
+
+
   @override
   Future<void> dispose(int? textureId) {
     return _channel.invokeMethod<void>(
@@ -38,8 +40,8 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
           'minBufferMs': bufferingConfiguration.minBufferMs,
           'maxBufferMs': bufferingConfiguration.maxBufferMs,
           'bufferForPlaybackMs': bufferingConfiguration.bufferForPlaybackMs,
-          'bufferForPlaybackAfterRebufferMs':
-              bufferingConfiguration.bufferForPlaybackAfterRebufferMs,
+          'bufferForPlaybackAfterRebuffedMs':
+              bufferingConfiguration.bufferForPlaybackAfterRebuffedMs,
         },
       );
 
@@ -47,6 +49,30 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
           ? Map<String, dynamic>.from(responseLinkedHashMap)
           : null;
     }
+
+    _channel.setMethodCallHandler((call)async{
+    switch(call.method){
+      case 'prepareToPip':
+        print("fucking prepareToPip");
+        pipLifeCycleCallback?.call(true);
+        break;
+      case 'exitPip':
+        print("fucking exitPip");
+        pipLifeCycleCallback?.call(false);
+        break;
+      case 'pipNotify':
+        print("fucking pipNotify ${pipInBackgroundCallback}");
+        try{
+          final map = call.arguments as Map<dynamic,dynamic>;
+          int position = map['position'];
+          int duration = map['duration'];
+          pipInBackgroundCallback?.call(position,duration);
+        }catch (e){
+          print("eeee==>>$e");
+        }
+        break;
+    }
+    });
     return response?['textureId'] as int?;
   }
 
@@ -345,7 +371,6 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
           }
 
           final Size size = Size(width, height);
-
           return VideoEvent(
             eventType: VideoEventType.initialized,
             key: key,

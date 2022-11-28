@@ -1,33 +1,37 @@
 package com.example.pip_flutter
 
 import android.app.Activity
+import android.app.Application
 import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.util.LongSparseArray
 import com.example.pip_flutter.PipFlutterPlayerCache.releaseCache
-import io.flutter.embedding.engine.plugins.FlutterPlugin
-import io.flutter.embedding.engine.plugins.activity.ActivityAware
-import io.flutter.plugin.common.MethodChannel.MethodCallHandler
-import io.flutter.embedding.engine.plugins.FlutterPlugin.FlutterPluginBinding
+import com.google.android.exoplayer2.util.Log.LOG_LEVEL_OFF
 import io.flutter.embedding.engine.loader.FlutterLoader
-import io.flutter.plugin.common.MethodCall
-import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugin.common.EventChannel
+import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.FlutterPlugin.FlutterPluginBinding
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.BinaryMessenger
+import io.flutter.plugin.common.EventChannel
+import io.flutter.plugin.common.MethodCall
+import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.view.TextureRegistry
-import java.lang.Exception
-import java.util.HashMap
+import org.lsposed.hiddenapibypass.HiddenApiBypass
+import java.lang.reflect.Field
 
 /**
  * Android platform implementation of the VideoPlayerPlugin.
  */
-class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
+class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
+    Application.ActivityLifecycleCallbacks {
     private val videoPlayers = LongSparseArray<PipFlutterPlayer>()
     private val dataSources = LongSparseArray<Map<String, Any?>>()
     private var flutterState: FlutterState? = null
@@ -37,8 +41,10 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     private var pipHandler: Handler? = null
     private var pipRunnable: Runnable? = null
 
+
     override fun onAttachedToEngine(binding: FlutterPluginBinding) {
         Log.e("CALLMETHOD", "onAttachedToEngine: ")
+        com.google.android.exoplayer2.util.Log.setLogLevel(LOG_LEVEL_OFF)
         val loader = FlutterLoader()
         flutterState = FlutterState(
             binding.applicationContext,
@@ -74,14 +80,23 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         Log.e("CALLMETHOD", "onAttachedToActivity: ")
-        activity = binding.activity
+        activity = binding.activity.apply {
+            this.application.registerActivityLifecycleCallbacks(this@PipFlutterPlugin)
+        }
     }
 
-    override fun onDetachedFromActivityForConfigChanges() {}
+    override fun onDetachedFromActivityForConfigChanges() {
+        onDetachedFromActivity()
+    }
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {}
 
-    override fun onDetachedFromActivity() {}
+    override fun onDetachedFromActivity() {
+        activity?.apply {
+            this.application.unregisterActivityLifecycleCallbacks(this@PipFlutterPlugin)
+        }
+        activity = null
+    }
 
     private fun disposeAllPlayers() {
         for (i in 0 until videoPlayers.size()) {
@@ -92,10 +107,14 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-        Log.e("CALLMETHOD", "onMethodCall: call.method --> "+call.method)
-        Log.e("CALLMETHOD", "onMethodCall: result --> "+result)
+        Log.e("CALLMETHOD", "onMethodCall: call.method --> " + call.method)
+//        Log.e("CALLMETHOD", "onMethodCall: result --> $result")
         if (flutterState == null || flutterState!!.textureRegistry == null) {
-            result.error("no_activity", "pipflutter_player plugin requires a foreground activity", null)
+            result.error(
+                "no_activity",
+                "pipflutter_player plugin requires a foreground activity",
+                null
+            )
             return
         }
         when (call.method) {
@@ -141,6 +160,51 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             }
         }
     }
+
+
+    override fun onActivityPaused(activity: Activity) {
+        if (videoPlayers.size() != 1) return
+        if (activity != this.activity || !isPictureInPictureSupported()) return
+        val player = videoPlayers.valueAt(0)
+        if (player.isPlaying() && !player.isPiping()) {
+            flutterState!!.invokeMethod("prepareToPip")
+        }
+    }
+
+    /**
+     * Activity mCanEnterPictureInPicture  wasn't update by performResume,should change it by private api
+     */
+    private fun setCanEnterPictureInPicture(activity: Activity) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val allInstanceFields: List<Field?> = HiddenApiBypass.getInstanceFields(
+                    Activity::class.java
+                ) as List<Field?>
+                val field = allInstanceFields.stream()
+                    .filter { e: Field? -> e!!.name == "mCanEnterPictureInPicture" }
+                    .findFirst().get()
+                field.isAccessible = true
+                field[activity] = true
+            } else {
+                val field = Activity::class.java.getDeclaredField("mCanEnterPictureInPicture")
+                field.isAccessible = true
+                field.set(activity, true)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    override fun onActivityResumed(activity: Activity) {
+        if (videoPlayers.size() != 1) return
+        if (activity != this.activity || !isPictureInPictureSupported()) return
+        if (activity.isInPictureInPictureMode) return
+        val player = videoPlayers.valueAt(0)
+        if (player.isPlaying() && player.isPiping()) {
+            flutterState!!.invokeMethod("exitPip")
+        }
+    }
+
 
     private fun onMethodCall(
         call: MethodCall,
@@ -318,7 +382,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             val headers: Map<String, String> =
                 getParameter(dataSource, HEADERS_PARAMETER, HashMap())
             PipFlutterPlayer.preCache(
-                flutterState!!.applicationContext,
+                flutterState?.applicationContext,
                 uri,
                 preCacheSize,
                 maxCacheSize,
@@ -338,11 +402,11 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
      */
     private fun stopPreCache(call: MethodCall, result: MethodChannel.Result) {
         val url = call.argument<String>(URL_PARAMETER)
-        PipFlutterPlayer.stopPreCache(flutterState!!.applicationContext, url, result)
+        PipFlutterPlayer.stopPreCache(flutterState?.applicationContext, url, result)
     }
 
     private fun clearCache(result: MethodChannel.Result) {
-        PipFlutterPlayer.clearCache(flutterState!!.applicationContext, result)
+        PipFlutterPlayer.clearCache(flutterState?.applicationContext, result)
     }
 
     private fun getTextureId(pipFlutterPlayer: PipFlutterPlayer): Long? {
@@ -373,6 +437,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                     val imageUrl = getParameter(dataSource, IMAGE_URL_PARAMETER, "")
                     val notificationChannelName =
                         getParameter<String?>(dataSource, NOTIFICATION_CHANNEL_NAME_PARAMETER, null)
+
                     val activityName =
                         getParameter(dataSource, ACTIVITY_NAME_PARAMETER, "MainActivity")
                     pipFlutterPlayer.setupPlayerNotification(
@@ -391,6 +456,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             videoPlayers.valueAt(index).disposeRemoteNotifications()
         }
     }
+
     @Suppress("UNCHECKED_CAST")
     private fun <T> getParameter(parameters: Map<String, Any?>?, key: String, defaultValue: T): T {
         if (parameters!!.containsKey(key)) {
@@ -410,8 +476,10 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
 
     private fun enablePictureInPicture(player: PipFlutterPlayer) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val act = activity?:return
             player.setupMediaSession(flutterState!!.applicationContext, true)
-            activity!!.enterPictureInPictureMode(PictureInPictureParams.Builder().build())
+            setCanEnterPictureInPicture(act)
+            val result = act.enterPictureInPictureMode(PictureInPictureParams.Builder().build())
             startPictureInPictureListenerTimer(player)
             player.onPictureInPictureStatusChanged(true)
         }
@@ -429,14 +497,26 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             pipHandler = Handler(Looper.getMainLooper())
             pipRunnable = Runnable {
                 if (activity!!.isInPictureInPictureMode) {
+                    countingPlayer(player)
                     pipHandler!!.postDelayed(pipRunnable!!, 100)
                 } else {
+
+
                     player.onPictureInPictureStatusChanged(false)
                     player.disposeMediaSession()
                     stopPipHandler()
                 }
             }
             pipHandler!!.post(pipRunnable!!)
+        }
+    }
+
+    private fun countingPlayer(player: PipFlutterPlayer) {
+        if(player.isPlaying()){
+            flutterState!!.invokeMethod("prepareToPip", mapOf(
+                "position" to player.position,
+                "duration" to player.duration,
+            ))
         }
     }
 
@@ -464,11 +544,11 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
     }
 
     private class FlutterState(
-            val applicationContext: Context,
-            val binaryMessenger: BinaryMessenger,
-            val keyForAsset: KeyForAssetFn,
-            val keyForAssetAndPackageName: KeyForAssetAndPackageName,
-            val textureRegistry: TextureRegistry?
+        val applicationContext: Context,
+        val binaryMessenger: BinaryMessenger,
+        val keyForAsset: KeyForAssetFn,
+        val keyForAssetAndPackageName: KeyForAssetAndPackageName,
+        val textureRegistry: TextureRegistry?
     ) {
         private val methodChannel: MethodChannel = MethodChannel(binaryMessenger, CHANNEL)
 
@@ -478,6 +558,10 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
 
         fun stopListening() {
             methodChannel.setMethodCallHandler(null)
+        }
+
+        fun invokeMethod(method: String, arg: Any? = null) {
+            methodChannel.invokeMethod(method, arg)
         }
 
     }
@@ -524,7 +608,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         const val MIN_BUFFER_MS = "minBufferMs"
         const val MAX_BUFFER_MS = "maxBufferMs"
         const val BUFFER_FOR_PLAYBACK_MS = "bufferForPlaybackMs"
-        const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = "bufferForPlaybackAfterRebufferMs"
+        const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = "bufferForPlaybackAfterRebuffedMs"
         const val CACHE_KEY_PARAMETER = "cacheKey"
         private const val INIT_METHOD = "init"
         private const val CREATE_METHOD = "create"
@@ -548,4 +632,20 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         private const val PRE_CACHE_METHOD = "preCache"
         private const val STOP_PRE_CACHE_METHOD = "stopPreCache"
     }
+
+    override fun onActivityStopped(activity: Activity) {
+    }
+
+    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+    }
+
+    override fun onActivityStarted(activity: Activity) {
+    }
+
+    override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {
+    }
+
+    override fun onActivityDestroyed(activity: Activity) {
+    }
+
 }
