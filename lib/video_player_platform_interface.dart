@@ -7,6 +7,7 @@ import 'method_channel_video_player.dart';
 
 
 typedef VideoPipLifeCycleCallback= void Function(bool isShouldOpenPip);
+typedef VideoPipFrameCallback= void Function();
 typedef VideoPipInBackgroundCallback= void Function(int position,int duration);
 /// The interface that implementations of video_player must implement.
 ///
@@ -26,6 +27,7 @@ abstract class VideoPlayerPlatform {
 
 
   VideoPipLifeCycleCallback? _pipLifeCycleCallback;
+  VideoPipFrameCallback? _pipFrameCallback;
   VideoPipInBackgroundCallback? _pipInBackgroundCallback;
 
 
@@ -33,11 +35,15 @@ abstract class VideoPlayerPlatform {
   void setPipLifeCycleCallback(VideoPipLifeCycleCallback? pipLifeCycleCallback){
     _pipLifeCycleCallback=pipLifeCycleCallback;
   }
+  void setPipFrameCallback(VideoPipFrameCallback? pipFrameCallback){
+    _pipFrameCallback=pipFrameCallback;
+  }
   void setPipInBackgroundCallback(VideoPipInBackgroundCallback? pipInBackgroundCallback){
     _pipInBackgroundCallback=pipInBackgroundCallback;
   }
 
   VideoPipLifeCycleCallback? get  pipLifeCycleCallback=>_pipLifeCycleCallback;
+  VideoPipFrameCallback? get  pipFrameCallback=>_pipFrameCallback;
   VideoPipInBackgroundCallback? get  pipInBackgroundCallback=>_pipInBackgroundCallback;
 
 
@@ -155,6 +161,11 @@ abstract class VideoPlayerPlatform {
 
   ///Enables PiP mode.
   Future<void> enablePictureInPicture(int? textureId, double? top, double? left,
+      double? width, double? height) {
+    throw UnimplementedError(
+        'enablePictureInPicture() has not been implemented.');
+  }
+  Future<void> enablePictureInPictureFrame(int? textureId, double? top, double? left,
       double? width, double? height) {
     throw UnimplementedError(
         'enablePictureInPicture() has not been implemented.');

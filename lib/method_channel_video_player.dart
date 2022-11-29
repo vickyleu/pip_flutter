@@ -52,16 +52,16 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
 
     _channel.setMethodCallHandler((call)async{
     switch(call.method){
+      case 'preparePipFrame':
+        pipFrameCallback?.call();
+        break;
       case 'prepareToPip':
-        print("fucking prepareToPip");
         pipLifeCycleCallback?.call(true);
         break;
       case 'exitPip':
-        print("fucking exitPip");
         pipLifeCycleCallback?.call(false);
         break;
       case 'pipNotify':
-        print("fucking pipNotify ${pipInBackgroundCallback}");
         try{
           final map = call.arguments as Map<dynamic,dynamic>;
           int position = map['position'];
@@ -251,6 +251,19 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
       double? width, double? height) async {
     return _channel.invokeMethod<void>(
       'enablePictureInPicture',
+      <String, dynamic>{
+        'textureId': textureId,
+        'top': top,
+        'left': left,
+        'width': width,
+        'height': height,
+      },
+    );
+  }  @override
+  Future<void> enablePictureInPictureFrame(int? textureId, double? top, double? left,
+      double? width, double? height) async {
+    return _channel.invokeMethod<void>(
+      'enablePictureInPictureFrame',
       <String, dynamic>{
         'textureId': textureId,
         'top': top,

@@ -166,12 +166,14 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   final PipFlutterPlayerBufferingConfiguration bufferingConfiguration;
 
   VideoPipLifeCycleCallback? pipLifeCycleCallback;
+  VideoPipFrameCallback? pipFrameCallback;
   VideoPipInBackgroundCallback? pipInBackgroundCallback;
   /// Constructs a [VideoPlayerController] and creates video controller on platform side.
   VideoPlayerController({
     this.bufferingConfiguration =
         const PipFlutterPlayerBufferingConfiguration(),
     this.pipLifeCycleCallback,
+    this.pipFrameCallback,
     this.pipInBackgroundCallback,
     bool autoCreate = true,
   }) : super(VideoPlayerValue(duration: null)) {
@@ -277,6 +279,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         .listen(eventListener, onError: errorListener);
 
     VideoPlayerPlatform.instance.setPipLifeCycleCallback(pipLifeCycleCallback);
+    VideoPlayerPlatform.instance.setPipFrameCallback(pipFrameCallback);
     VideoPlayerPlatform.instance.setPipInBackgroundCallback(pipInBackgroundCallback);
   }
 
@@ -465,7 +468,6 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   }
 
   Future<void> _applyPlayPause() async {
-    print("_applyPlayPause stack:::${StackTrace.current}");
     if (!_created || _isDisposed) {
       return;
     }
@@ -608,6 +610,11 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   Future<void> enablePictureInPicture(
       {double? top, double? left, double? width, double? height}) async {
     await _videoPlayerPlatform.enablePictureInPicture(
+        textureId, top, left, width, height);
+  }
+  Future<void> enablePictureInPictureFrame(
+      {double? top, double? left, double? width, double? height}) async {
+    await _videoPlayerPlatform.enablePictureInPictureFrame(
         textureId, top, left, width, height);
   }
 

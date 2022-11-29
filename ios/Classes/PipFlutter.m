@@ -602,13 +602,11 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     self._pictureInPicture = pictureInPicture;
     if (@available(iOS 9.0, *)) {
         if (_pipController && self._pictureInPicture && ![_pipController isPictureInPictureActive]) {
-            NSLog(@"PictureInPicture === >> %@", [NSString stringWithFormat:@"setPictureInPicture _pictureInPicture isPictureInPictureActive:%@ ",[_pipController isPictureInPictureActive] ? @"true":@"false"]);
             dispatch_async(dispatch_get_main_queue(), ^{
-                NSLog(@"PictureInPicture === >> %@", [NSString stringWithFormat:@"setPictureInPicture startPictureInPicture dispatch_get_main_queue:%@ ",[_pipController isPictureInPictureActive] ? @"true":@"false"]);
                 [_pipController startPictureInPicture];
             });
         } else if (_pipController && !self._pictureInPicture && [_pipController isPictureInPictureActive]) {
-            NSLog(@"PictureInPicture === >> %@", [NSString stringWithFormat:@"setPictureInPicture stopPictureInPicture isPictureInPictureActive:%@ ",[_pipController isPictureInPictureActive] ? @"true":@"false"]);
+          
             dispatch_async(dispatch_get_main_queue(), ^{
                 [_pipController stopPictureInPicture];
             });
@@ -633,15 +631,11 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         
       
         if (!_pipController && self._playerLayer && [AVPictureInPictureController isPictureInPictureSupported]) {
-            NSLog(@"PictureInPicture === >> %@", [NSString stringWithFormat:@"setupPipController _pipController:%@  _playerLayer:%@ isPictureInPictureSupported:%@ ",_pipController,self._playerLayer,
-                                                  [AVPictureInPictureController isPictureInPictureSupported] ? @"true":@"false"]);
-            
             _pipController = [[AVPictureInPictureController alloc] initWithPlayerLayer:self._playerLayer];
             if (@available(iOS 14.2, *)){
                 _pipController.canStartPictureInPictureAutomaticallyFromInline = YES;
             }
             _pipController.delegate = self;
-            NSLog(@"PictureInPicture === >> %@", [NSString stringWithFormat:@"setupPipController _pipController.delegate %@",_pipController.delegate]);
         }
     } else {
         // Fallback on earlier versions
@@ -654,10 +648,9 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     [self usePlayerLayer:frame];
 }
 
-- (void)usePlayerLayer: (CGRect) frame
-{
-    if( _player )
-    {
+
+-(void)playerLayerSetup: (CGRect) frame{
+    if(_player){
         // Create new controller passing reference to the AVPlayerLayer
         self._playerLayer = [AVPlayerLayer playerLayerWithPlayer:_player];
         UIViewController* vc = [[[UIApplication sharedApplication] keyWindow] rootViewController];
@@ -669,8 +662,18 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         if (@available(iOS 9.0, *)) {
             _pipController = NULL;
         }
-        NSLog(@"PictureInPicture === >> %@", [NSString stringWithFormat:@"setupPipController width:%f  height:%f ",frame.size.width,frame.size.height]);
         [self setupPipController];
+    }
+}
+
+
+- (void)usePlayerLayer: (CGRect) frame
+{
+    if( _player )
+    {
+        if (!self._playerLayer){
+            return;
+        }
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
             [self setPictureInPicture:true];
@@ -680,8 +683,8 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 
 - (void)disablePictureInPicture
 {
-    [self setPictureInPicture:true];
-   
+    [self setPictureInPicture:false];
+    NSLog(@"applicationWillEnterForeground disablePictureInPicture");
     if (self._playerLayer){
         [self._playerLayer removeFromSuperlayer];
         self._playerLayer = nil;
@@ -694,8 +697,6 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 
 #if TARGET_OS_IOS
 - (void)pictureInPictureControllerDidStopPictureInPicture:(AVPictureInPictureController *)pictureInPictureController  API_AVAILABLE(ios(9.0)){
-  
-    NSLog(@"PictureInPicture === >> %@", [NSString stringWithFormat:@"pictureInPictureControllerDidStopPictureInPicture delegate:%@ ",pictureInPictureController]);
     [self disablePictureInPicture];
 }
 
@@ -710,11 +711,9 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 }
 
 - (void)pictureInPictureControllerWillStartPictureInPicture:(AVPictureInPictureController *)pictureInPictureController {
-    NSLog(@"PictureInPicture === >> %@", [NSString stringWithFormat:@"pictureInPictureControllerWillStartPictureInPicture delegate:%@ ",pictureInPictureController]);
 }
 
 - (void)pictureInPictureController:(AVPictureInPictureController *)pictureInPictureController failedToStartPictureInPictureWithError:(NSError *)error {
-    NSLog(@"PictureInPicture === >> %@", [NSString stringWithFormat:@"failedToStartPictureInPictureWithError %@ ",error]);
 }
 
 - (void)pictureInPictureController:(AVPictureInPictureController *)pictureInPictureController restoreUserInterfaceForPictureInPictureStopWithCompletionHandler:(void (^)(BOOL))completionHandler {

@@ -226,6 +226,7 @@ class PipFlutterPlayerController {
 
 
   VideoPipLifeCycleCallback? pipLifeCycleCallback;
+  VideoPipFrameCallback? pipFrameCallback;
   VideoPipInBackgroundCallback? pipInBackgroundCallback;
 
   PipFlutterPlayerController(
@@ -233,6 +234,7 @@ class PipFlutterPlayerController {
     this.pipFlutterPlayerPlaylistConfiguration,
     PipFlutterPlayerDataSource? pipFlutterPlayerDataSource,
     this.pipLifeCycleCallback,
+    this.pipFrameCallback,
     this.pipInBackgroundCallback,
   }) {
     _eventListeners.add(eventListener);
@@ -269,6 +271,7 @@ class PipFlutterPlayerController {
           bufferingConfiguration:
               pipFlutterPlayerDataSource.bufferingConfiguration,
           pipLifeCycleCallback:pipLifeCycleCallback,
+          pipFrameCallback:pipFrameCallback,
           pipInBackgroundCallback:pipInBackgroundCallback,
       );
       videoPlayerController?.addListener(_onVideoPlayerChanged);
@@ -1131,6 +1134,43 @@ class PipFlutterPlayerController {
         }
         final Offset position = renderBox.localToGlobal(Offset.zero);
         return videoPlayerController?.enablePictureInPicture(
+          left: position.dx,
+          top: position.dy,
+          width: renderBox.size.width,
+          height: renderBox.size.height,
+        );
+      } else {
+        PipFlutterPlayerUtils.log("Unsupported PiP in current platform.");
+      }
+    } else {
+      PipFlutterPlayerUtils.log(
+          "Picture in picture is not supported in this device. If you're "
+          "using Android, please check if you're using activity v2 "
+          "embedding.");
+    }
+  }
+
+  Future<void>? enablePictureInPictureFrame(
+      GlobalKey pipFlutterPlayerGlobalKey) async {
+    if (videoPlayerController == null) {
+      throw StateError("The data source has not been initialized");
+    }
+
+    final bool isPipSupported =
+        (await videoPlayerController!.isPictureInPictureSupported()) ?? false;
+
+    if (isPipSupported) {
+      if (Platform.isIOS) {
+        final RenderBox? renderBox = pipFlutterPlayerGlobalKey.currentContext!
+            .findRenderObject() as RenderBox?;
+        if (renderBox == null) {
+          PipFlutterPlayerUtils.log(
+              "Can't show PiP. RenderBox is null. Did you provide valid global"
+              " key?");
+          return;
+        }
+        final Offset position = renderBox.localToGlobal(Offset.zero);
+        return videoPlayerController?.enablePictureInPictureFrame(
           left: position.dx,
           top: position.dy,
           width: renderBox.size.width,

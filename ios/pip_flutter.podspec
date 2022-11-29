@@ -16,6 +16,7 @@ A new flutter plugin project.
   s.public_header_files = 'Classes/**/*.h'
   s.dependency 'Flutter'
   s.dependency 'Cache', '~> 6.0.0'
+  s.dependency 'Aspects', '~> 1.4'
   s.dependency 'HLSCachingReverseProxyServer'
 
   s.platform = :ios, '11.0'

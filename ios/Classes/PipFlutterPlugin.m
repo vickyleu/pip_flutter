@@ -1,71 +1,116 @@
 
 #import "PipFlutterPlugin.h"
 #import <pip_flutter/pip_flutter-Swift.h>
+#import <Aspects/Aspects.h>
 
 #if !__has_feature(objc_arc)
 #error Code Requires ARC.
 #endif
 
-@interface PipFlutterPlugin()
-@property (nonatomic, strong)FlutterMethodChannel* channel;
-@property (nonatomic, assign)UIBackgroundTaskIdentifier bgTask;
+@interface PipFlutterPlugin ()
+@property(nonatomic, strong) FlutterMethodChannel *channel;
+@property(nonatomic, assign) UIBackgroundTaskIdentifier bgTask;
+@property(nonatomic, assign) BOOL isInPipMode;
+@property(nonatomic, strong) id<AspectToken> aspect;
 @end
+
 @implementation PipFlutterPlugin
 
 static PipFlutterPlugin *_sharedInstance = nil;
 
-NSMutableDictionary* _dataSourceDict;
-NSMutableDictionary*  _timeObserverIdDict;
-NSMutableDictionary*  _artworkImageDict;
-CacheManager* _cacheManager;
+NSMutableDictionary *_dataSourceDict;
+NSMutableDictionary *_timeObserverIdDict;
+NSMutableDictionary *_artworkImageDict;
+CacheManager *_cacheManager;
 int texturesCount = -1;
-PipFlutter* _notificationPlayer;
+PipFlutter *_notificationPlayer;
 bool _remoteCommandsInitialized = false;
 
 
-+(instancetype) shareInstance
-{
-    return _sharedInstance ;
++ (instancetype)shareInstance {
+    return _sharedInstance;
 }
 
 #pragma mark - FlutterPlugin protocol
-+ (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
-    PipFlutterPlugin* instance = [[PipFlutterPlugin alloc] initWithRegistrar:registrar];
-    FlutterMethodChannel* channel =
-            [FlutterMethodChannel methodChannelWithName:@"pipflutter_player_channel"
-                                        binaryMessenger:[registrar messenger]];
+
++ (void)registerWithRegistrar:(NSObject <FlutterPluginRegistrar> *)registrar {
+    PipFlutterPlugin *instance = [[PipFlutterPlugin alloc] initWithRegistrar:registrar];
+    FlutterMethodChannel *channel =
+    [FlutterMethodChannel methodChannelWithName:@"pipflutter_player_channel"
+                                binaryMessenger:[registrar messenger]];
     instance.channel = channel;
+    instance.isInPipMode = NO;
     _sharedInstance = instance;
     [registrar addMethodCallDelegate:instance channel:channel];
     [registrar addApplicationDelegate:instance];
-    //[registrar publish:instance];
+    
+    
     [registrar registerViewFactory:instance withId:@"com.pipflutter/pipflutter_player"];
 }
 
+-(void)aaa{
+    if(self.aspect)
+        return;
+    self.aspect = [FlutterViewController aspect_hookSelector:@selector(viewDidLayoutSubviews) withOptions:AspectPositionAfter usingBlock:^(id <AspectInfo> aspectInfo) {
+        if(!self.isInPipMode){
+            FlutterViewController* controller = (FlutterViewController*)[[[UIApplication sharedApplication] keyWindow] rootViewController];
+            if ([self.players count] != 1) return;
+            if (![[controller class] isEqual:[FlutterViewController class]]) return;
+            PipFlutter * player = [[self.players allValues] lastObject] ;
+            if ([player isPlaying]&& ![player isPiping] ) {
+                [self.channel invokeMethod:@"preparePipFrame" arguments:nil];
+                self.isInPipMode = YES;
+            }
+        }
+    } error:NULL];
+}
 
--(void) applicationDidEnterBackground:(UIApplication *)application{
+-(void)bbb{
+    if(self.aspect){
+        [self.aspect remove];
+    }
+}
+
+- (void)applicationWillEnterForeground:(UIApplication *)application {
+
+    UIApplication *app = [UIApplication sharedApplication];
+    [app endBackgroundTask:self.bgTask];
     if ([_players count] != 1) return;
-    PipFlutter * player = [[_players allValues] lastObject] ;
-    if ([player isPlaying]&& ![player isPiping] ) {
+    PipFlutter *player = [[_players allValues] lastObject];
+    if ([player isPlaying] && [player isPiping]) {
+        [self.channel invokeMethod:@"exitPip" arguments:nil];
+    }
+    self.bgTask = UIBackgroundTaskInvalid;
+
+    self.isInPipMode = NO;
+
+    NSLog(@"applicationWillEnterForeground exitPip");
+}
+
+- (void)applicationDidEnterBackground:(UIApplication *)application {
+    if ([_players count] != 1) return;
+    PipFlutter *player = [[_players allValues] lastObject];
+    if ([player isPlaying] && ![player isPiping]) {
+        [self.channel invokeMethod:@"prepareToPip" arguments:nil];
         [self backgroundHandler:player];
     }
 }
 
 
--(void)notifyDart:(PipFlutter *)player{
+- (void)notifyDart:(PipFlutter *)player {
     NSInteger position = [@(player.position) integerValue];
-    NSInteger duration =[@(player.duration) integerValue];
-    [self.channel invokeMethod:@"pipNotify" arguments:@{@"position":@(position),@"duration":@(duration)}];
+    NSInteger duration = [@(player.duration) integerValue];
+    [self.channel invokeMethod:@"pipNotify" arguments:@{@"position": @(position), @"duration": @(duration)}];
 }
 
 
 - (void)backgroundHandler:(PipFlutter *)player {
     NSLog(@"### -->backgroundinghandler");
     UIApplication *app = [UIApplication sharedApplication];
-     self.bgTask = [app beginBackgroundTaskWithExpirationHandler:^{
-        dispatch_async(dispatch_get_main_queue(),^{
-            if( self.bgTask != UIBackgroundTaskInvalid){
-//                bgTask = UIBackgroundTaskInvalid;
+    self.bgTask = [app beginBackgroundTaskWithExpirationHandler:^{
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.bgTask != UIBackgroundTaskInvalid) {
+                //                bgTask = UIBackgroundTaskInvalid;
             }
         });
         NSLog(@"====任务完成了。。。。。。。。。。。。。。。===>");
@@ -84,17 +129,8 @@ bool _remoteCommandsInitialized = false;
     });
 }
 
--(void) applicationWillEnterForeground:(UIApplication *)application{
-    UIApplication *app = [UIApplication sharedApplication];
-    [app endBackgroundTask:self.bgTask];
-    if ([_players count] != 1) return;
-    PipFlutter * player = [[_players allValues] lastObject] ;
-    if ([player isPlaying] && [player isPiping]) {
-        [self.channel invokeMethod:@"exitPip" arguments:nil];
-    }
-    self.bgTask = UIBackgroundTaskInvalid;
-}
-- (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
+
+- (instancetype)initWithRegistrar:(NSObject <FlutterPluginRegistrar> *)registrar {
     self = [super init];
     NSAssert(self, @"super init cannot be nil");
     _messenger = [registrar messenger];
@@ -108,89 +144,92 @@ bool _remoteCommandsInitialized = false;
     return self;
 }
 
-- (void)detachFromEngineForRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
-    for (NSNumber* textureId in _players.allKeys) {
-        PipFlutter* player = _players[textureId];
+- (void)detachFromEngineForRegistrar:(NSObject <FlutterPluginRegistrar> *)registrar {
+    for (NSNumber *textureId in _players.allKeys) {
+        PipFlutter *player = _players[textureId];
         [player disposeSansEventChannel];
     }
     [_players removeAllObjects];
 }
 
 #pragma mark - FlutterPlatformViewFactory protocol
-- (NSObject<FlutterPlatformView>*)createWithFrame:(CGRect)frame
-                                   viewIdentifier:(int64_t)viewId
-                                        arguments:(id _Nullable)args {
-    NSNumber* textureId = [args objectForKey:@"textureId"];
-    PipFlutter* player = [_players objectForKey:@(textureId.intValue)];
+
+- (NSObject <FlutterPlatformView> *)createWithFrame:(CGRect)frame
+                                     viewIdentifier:(int64_t)viewId
+                                          arguments:(id _Nullable)args {
+    NSNumber *textureId = [args objectForKey:@"textureId"];
+    PipFlutter *player = [_players objectForKey:@(textureId.intValue)];
     return player;
 }
 
-- (NSObject<FlutterMessageCodec>*)createArgsCodec {
+- (NSObject <FlutterMessageCodec> *)createArgsCodec {
     return [FlutterStandardMessageCodec sharedInstance];
 }
 
 #pragma mark - PipFlutterPlugin class
+
 - (int)newTextureId {
     texturesCount += 1;
     return texturesCount;
 }
-- (void)onPlayerSetup:(PipFlutter*)player
+
+- (void)onPlayerSetup:(PipFlutter *)player
                result:(FlutterResult)result {
     int64_t textureId = [self newTextureId];
-    FlutterEventChannel* eventChannel = [FlutterEventChannel
+    FlutterEventChannel *eventChannel = [FlutterEventChannel
                                          eventChannelWithName:[NSString stringWithFormat:@"pipflutter_player_channel/videoEvents%lld",
                                                                textureId]
                                          binaryMessenger:_messenger];
     [player setMixWithOthers:false];
     [eventChannel setStreamHandler:player];
     player.eventChannel = eventChannel;
-
-    [player setOnBackgroundCountingListener: ^(void){
+    
+    [player setOnBackgroundCountingListener:^(void) {
         self.bgTask = UIBackgroundTaskInvalid;
     }];
-
+    
     _players[@(textureId)] = player;
-
-    result(@{@"textureId" : @(textureId)});
+    
+    result(@{@"textureId": @(textureId)});
 }
 
-- (void) setupRemoteNotification :(PipFlutter*) player{
+- (void)setupRemoteNotification:(PipFlutter *)player {
     _notificationPlayer = player;
     [self stopOtherUpdateListener:player];
-    NSDictionary* dataSource = [_dataSourceDict objectForKey:[self getTextureId:player]];
+    NSDictionary *dataSource = [_dataSourceDict objectForKey:[self getTextureId:player]];
     BOOL showNotification = false;
     id showNotificationObject = [dataSource objectForKey:@"showNotification"];
     if (showNotificationObject != [NSNull null]) {
         showNotification = [[dataSource objectForKey:@"showNotification"] boolValue];
     }
-    NSString* title = dataSource[@"title"];
-    NSString* author = dataSource[@"author"];
-    NSString* imageUrl = dataSource[@"imageUrl"];
-
-    if (showNotification){
+    NSString *title = dataSource[@"title"];
+    NSString *author = dataSource[@"author"];
+    NSString *imageUrl = dataSource[@"imageUrl"];
+    
+    if (showNotification) {
         [self setRemoteCommandsNotificationActive];
-        [self setupRemoteCommands: player];
+        [self setupRemoteCommands:player];
         [self setupRemoteCommandNotification:player withTitle:title withAuthor:author withImageUrl:imageUrl];
         [self setupUpdateListener:player withTitle:title withAuthor:author withImageUrl:imageUrl];
     }
 }
 
-- (void) setRemoteCommandsNotificationActive{
+- (void)setRemoteCommandsNotificationActive {
     [[AVAudioSession sharedInstance] setActive:true error:nil];
     [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
 }
 
-- (void) setRemoteCommandsNotificationNotActive{
+- (void)setRemoteCommandsNotificationNotActive {
     if ([_players count] == 0) {
         [[AVAudioSession sharedInstance] setActive:false error:nil];
     }
-
+    
     [[UIApplication sharedApplication] endReceivingRemoteControlEvents];
 }
 
 
-- (void) setupRemoteCommands:(PipFlutter*)player  {
-    if (_remoteCommandsInitialized){
+- (void)setupRemoteCommands:(PipFlutter *)player {
+    if (_remoteCommandsInitialized) {
         return;
     }
     MPRemoteCommandCenter *commandCenter = [MPRemoteCommandCenter sharedCommandCenter];
@@ -202,42 +241,41 @@ bool _remoteCommandsInitialized = false;
     if (@available(iOS 9.1, *)) {
         [commandCenter.changePlaybackPositionCommand setEnabled:YES];
     }
-
-    [commandCenter.togglePlayPauseCommand addTargetWithHandler: ^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
-        if (_notificationPlayer != [NSNull null]){
-            if (_notificationPlayer.isPlaying){
-                _notificationPlayer.eventSink(@{@"event" : @"play"});
+    
+    [commandCenter.togglePlayPauseCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *_Nonnull event) {
+        if (_notificationPlayer != [NSNull null]) {
+            if (_notificationPlayer.isPlaying) {
+                _notificationPlayer.eventSink(@{@"event": @"play"});
             } else {
-                _notificationPlayer.eventSink(@{@"event" : @"pause"});
+                _notificationPlayer.eventSink(@{@"event": @"pause"});
             }
         }
         return MPRemoteCommandHandlerStatusSuccess;
     }];
-
-    [commandCenter.playCommand addTargetWithHandler: ^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
-        if (_notificationPlayer != [NSNull null]){
-            _notificationPlayer.eventSink(@{@"event" : @"play"});
+    
+    [commandCenter.playCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *_Nonnull event) {
+        if (_notificationPlayer != [NSNull null]) {
+            _notificationPlayer.eventSink(@{@"event": @"play"});
         }
         return MPRemoteCommandHandlerStatusSuccess;
     }];
-
-    [commandCenter.pauseCommand addTargetWithHandler: ^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
-        if (_notificationPlayer != [NSNull null]){
-            _notificationPlayer.eventSink(@{@"event" : @"pause"});
+    
+    [commandCenter.pauseCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *_Nonnull event) {
+        if (_notificationPlayer != [NSNull null]) {
+            _notificationPlayer.eventSink(@{@"event": @"pause"});
         }
         return MPRemoteCommandHandlerStatusSuccess;
     }];
-
-
-
+    
+    
     if (@available(iOS 9.1, *)) {
-        [commandCenter.changePlaybackPositionCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent * _Nonnull event) {
-            if (_notificationPlayer != [NSNull null]){
-                MPChangePlaybackPositionCommandEvent * playbackEvent = (MPChangePlaybackRateCommandEvent * ) event;
+        [commandCenter.changePlaybackPositionCommand addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *_Nonnull event) {
+            if (_notificationPlayer != [NSNull null]) {
+                MPChangePlaybackPositionCommandEvent *playbackEvent = (MPChangePlaybackRateCommandEvent *) event;
                 CMTime time = CMTimeMake(playbackEvent.positionTime, 1);
                 int64_t millis = [PipFlutterTimeUtils FLTCMTimeToMillis:(time)];
-                [_notificationPlayer seekTo: millis];
-                _notificationPlayer.eventSink(@{@"event" : @"seek", @"position": @(millis)});
+                [_notificationPlayer seekTo:millis];
+                _notificationPlayer.eventSink(@{@"event": @"seek", @"position": @(millis)});
             }
             return MPRemoteCommandHandlerStatusSuccess;
         }];
@@ -245,48 +283,47 @@ bool _remoteCommandsInitialized = false;
     _remoteCommandsInitialized = true;
 }
 
-- (void) setupRemoteCommandNotification:(PipFlutter*)player withTitle: (NSString*) title withAuthor:(NSString*) author withImageUrl:(NSString*) imageUrl{
-    float positionInSeconds = player.position /1000;
-    float durationInSeconds = player.duration/ 1000;
-
-
-    NSMutableDictionary * nowPlayingInfoDict = [@{MPMediaItemPropertyArtist: author,
-                                                  MPMediaItemPropertyTitle: title,
-                                                  MPNowPlayingInfoPropertyElapsedPlaybackTime: [ NSNumber numberWithFloat : positionInSeconds],
-                                                  MPMediaItemPropertyPlaybackDuration: [NSNumber numberWithFloat:durationInSeconds],
-                                                  MPNowPlayingInfoPropertyPlaybackRate: @1,
-    } mutableCopy];
-
-    if (imageUrl != [NSNull null]){
-        NSString* key =  [self getTextureId:player];
-        MPMediaItemArtwork* artworkImage = [_artworkImageDict objectForKey:key];
-
-        if (key != [NSNull null]){
-            if (artworkImage){
+- (void)setupRemoteCommandNotification:(PipFlutter *)player withTitle:(NSString *)title withAuthor:(NSString *)author withImageUrl:(NSString *)imageUrl {
+    float positionInSeconds = player.position / 1000;
+    float durationInSeconds = player.duration / 1000;
+    
+    
+    NSMutableDictionary *nowPlayingInfoDict = [@{MPMediaItemPropertyArtist: author,
+                                                 MPMediaItemPropertyTitle: title,
+                                                 MPNowPlayingInfoPropertyElapsedPlaybackTime: [NSNumber numberWithFloat:positionInSeconds],
+                                                 MPMediaItemPropertyPlaybackDuration: [NSNumber numberWithFloat:durationInSeconds],
+                                                 MPNowPlayingInfoPropertyPlaybackRate: @1,
+                                               } mutableCopy];
+    
+    if (imageUrl != [NSNull null]) {
+        NSString *key = [self getTextureId:player];
+        MPMediaItemArtwork *artworkImage = [_artworkImageDict objectForKey:key];
+        
+        if (key != [NSNull null]) {
+            if (artworkImage) {
                 [nowPlayingInfoDict setObject:artworkImage forKey:MPMediaItemPropertyArtwork];
                 [MPNowPlayingInfoCenter defaultCenter].nowPlayingInfo = nowPlayingInfoDict;
-
+                
             } else {
                 dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
                 dispatch_async(queue, ^{
-                    @try{
-                        UIImage * tempArtworkImage = nil;
-                        if ([imageUrl rangeOfString:@"http"].location == NSNotFound){
+                    @try {
+                        UIImage *tempArtworkImage = nil;
+                        if ([imageUrl rangeOfString:@"http"].location == NSNotFound) {
                             tempArtworkImage = [UIImage imageWithContentsOfFile:imageUrl];
                         } else {
-                            NSURL *nsImageUrl =[NSURL URLWithString:imageUrl];
+                            NSURL *nsImageUrl = [NSURL URLWithString:imageUrl];
                             tempArtworkImage = [UIImage imageWithData:[NSData dataWithContentsOfURL:nsImageUrl]];
                         }
-                        if(tempArtworkImage)
-                        {
-                            MPMediaItemArtwork* artworkImage = [[MPMediaItemArtwork alloc] initWithImage: tempArtworkImage];
+                        if (tempArtworkImage) {
+                            MPMediaItemArtwork *artworkImage = [[MPMediaItemArtwork alloc] initWithImage:tempArtworkImage];
                             [_artworkImageDict setObject:artworkImage forKey:key];
                             [nowPlayingInfoDict setObject:artworkImage forKey:MPMediaItemPropertyArtwork];
                         }
                         [MPNowPlayingInfoCenter defaultCenter].nowPlayingInfo = nowPlayingInfoDict;
                     }
-                    @catch(NSException *exception) {
-
+                    @catch (NSException *exception) {
+                        
                     }
                 });
             }
@@ -297,129 +334,129 @@ bool _remoteCommandsInitialized = false;
 }
 
 
-
-- (NSString*) getTextureId: (PipFlutter*) player{
-    NSArray* temp = [_players allKeysForObject: player];
-    NSString* key = [temp lastObject];
+- (NSString *)getTextureId:(PipFlutter *)player {
+    NSArray *temp = [_players allKeysForObject:player];
+    NSString *key = [temp lastObject];
     return key;
 }
 
-- (void) setupUpdateListener:(PipFlutter*)player withTitle:(NSString*) title withAuthor:(NSString*) author withImageUrl:(NSString*) imageUrl  {
-    id _timeObserverId = [player.player addPeriodicTimeObserverForInterval:CMTimeMake(1, 1) queue:NULL usingBlock:^(CMTime time){
+- (void)setupUpdateListener:(PipFlutter *)player withTitle:(NSString *)title withAuthor:(NSString *)author withImageUrl:(NSString *)imageUrl {
+    id _timeObserverId = [player.player addPeriodicTimeObserverForInterval:CMTimeMake(1, 1) queue:NULL usingBlock:^(CMTime time) {
         [self setupRemoteCommandNotification:player withTitle:title withAuthor:author withImageUrl:imageUrl];
     }];
-
-    NSString* key =  [self getTextureId:player];
-    [ _timeObserverIdDict setObject:_timeObserverId forKey: key];
+    
+    NSString *key = [self getTextureId:player];
+    [_timeObserverIdDict setObject:_timeObserverId forKey:key];
 }
 
 
-- (void) disposeNotificationData: (PipFlutter*)player{
-    if (player == _notificationPlayer){
+- (void)disposeNotificationData:(PipFlutter *)player {
+    if (player == _notificationPlayer) {
         _notificationPlayer = NULL;
         _remoteCommandsInitialized = false;
     }
-    NSString* key =  [self getTextureId:player];
+    NSString *key = [self getTextureId:player];
     id _timeObserverId = _timeObserverIdDict[key];
-    [_timeObserverIdDict removeObjectForKey: key];
+    [_timeObserverIdDict removeObjectForKey:key];
     [_artworkImageDict removeObjectForKey:key];
-    if (_timeObserverId){
+    if (_timeObserverId) {
         [player.player removeTimeObserver:_timeObserverId];
         _timeObserverId = nil;
     }
-    [MPNowPlayingInfoCenter defaultCenter].nowPlayingInfo =  @{};
+    [MPNowPlayingInfoCenter defaultCenter].nowPlayingInfo = @{};
 }
 
-- (void) stopOtherUpdateListener: (PipFlutter*) player{
-    NSString* currentPlayerTextureId = [self getTextureId:player];
-    for (NSString* textureId in _timeObserverIdDict.allKeys) {
-        if (currentPlayerTextureId == textureId){
+- (void)stopOtherUpdateListener:(PipFlutter *)player {
+    NSString *currentPlayerTextureId = [self getTextureId:player];
+    for (NSString *textureId in _timeObserverIdDict.allKeys) {
+        if (currentPlayerTextureId == textureId) {
             continue;
         }
-
+        
         id timeObserverId = [_timeObserverIdDict objectForKey:textureId];
-        PipFlutter* playerToRemoveListener = [_players objectForKey:textureId];
-        [playerToRemoveListener.player removeTimeObserver: timeObserverId];
+        PipFlutter *playerToRemoveListener = [_players objectForKey:textureId];
+        [playerToRemoveListener.player removeTimeObserver:timeObserverId];
     }
     [_timeObserverIdDict removeAllObjects];
-
+    
 }
 
 
-- (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
-
-
+- (void)handleMethodCall:(FlutterMethodCall *)call result:(FlutterResult)result {
+    
+    
     if ([@"init" isEqualToString:call.method]) {
         // Allow audio playback when the Ring/Silent switch is set to silent
-        for (NSNumber* textureId in _players) {
+        for (NSNumber *textureId in _players) {
             [_players[textureId] dispose];
         }
-
+        
         [_players removeAllObjects];
         result(nil);
     } else if ([@"create" isEqualToString:call.method]) {
-        PipFlutter* player = [[PipFlutter alloc] initWithFrame:CGRectZero];
+        PipFlutter *player = [[PipFlutter alloc] initWithFrame:CGRectZero];
         [self onPlayerSetup:player result:result];
     } else {
-        NSDictionary* argsMap = call.arguments;
-        int64_t textureId = ((NSNumber*)argsMap[@"textureId"]).unsignedIntegerValue;
-        PipFlutter* player = _players[@(textureId)];
+        NSDictionary *argsMap = call.arguments;
+        int64_t textureId = ((NSNumber *) argsMap[@"textureId"]).unsignedIntegerValue;
+        PipFlutter *player = _players[@(textureId)];
         if ([@"setDataSource" isEqualToString:call.method]) {
             [player clear];
             // This call will clear cached frame because we will return transparent frame
-
-            NSDictionary* dataSource = argsMap[@"dataSource"];
+            
+            NSDictionary *dataSource = argsMap[@"dataSource"];
             [_dataSourceDict setObject:dataSource forKey:[self getTextureId:player]];
-            NSString* assetArg = dataSource[@"asset"];
-            NSString* uriArg = dataSource[@"uri"];
-            NSString* key = dataSource[@"key"];
-            NSString* certificateUrl = dataSource[@"certificateUrl"];
-            NSString* licenseUrl = dataSource[@"licenseUrl"];
-            NSDictionary* headers = dataSource[@"headers"];
-            NSString* cacheKey = dataSource[@"cacheKey"];
-            NSNumber* maxCacheSize = dataSource[@"maxCacheSize"];
-            NSString* videoExtension = dataSource[@"videoExtension"];
+            NSString *assetArg = dataSource[@"asset"];
+            NSString *uriArg = dataSource[@"uri"];
+            NSString *key = dataSource[@"key"];
+            NSString *certificateUrl = dataSource[@"certificateUrl"];
+            NSString *licenseUrl = dataSource[@"licenseUrl"];
+            NSDictionary *headers = dataSource[@"headers"];
+            NSString *cacheKey = dataSource[@"cacheKey"];
+            NSNumber *maxCacheSize = dataSource[@"maxCacheSize"];
+            NSString *videoExtension = dataSource[@"videoExtension"];
             
             int overriddenDuration = 0;
-            if ([dataSource objectForKey:@"overriddenDuration"] != [NSNull null]){
+            if ([dataSource objectForKey:@"overriddenDuration"] != [NSNull null]) {
                 overriddenDuration = [dataSource[@"overriddenDuration"] intValue];
             }
-
+            
             BOOL useCache = false;
             id useCacheObject = [dataSource objectForKey:@"useCache"];
             if (useCacheObject != [NSNull null]) {
                 useCache = [[dataSource objectForKey:@"useCache"] boolValue];
-                if (useCache){
+                if (useCache) {
                     [_cacheManager setMaxCacheSize:maxCacheSize];
                 }
             }
-
-            if (headers == [NSNull null] || headers == NULL){
+            
+            if (headers == [NSNull null] || headers == NULL) {
                 headers = @{};
             }
-
+            
             if (assetArg) {
-                NSString* assetPath;
-                NSString* package = dataSource[@"package"];
+                NSString *assetPath;
+                NSString *package = dataSource[@"package"];
                 if (![package isEqual:[NSNull null]]) {
                     assetPath = [_registrar lookupKeyForAsset:assetArg fromPackage:package];
                 } else {
                     assetPath = [_registrar lookupKeyForAsset:assetArg];
                 }
-                [player setDataSourceAsset:assetPath withKey:key withCertificateUrl:certificateUrl withLicenseUrl: licenseUrl cacheKey:cacheKey cacheManager:_cacheManager overriddenDuration:overriddenDuration];
+                [player setDataSourceAsset:assetPath withKey:key withCertificateUrl:certificateUrl withLicenseUrl:licenseUrl cacheKey:cacheKey cacheManager:_cacheManager overriddenDuration:overriddenDuration];
             } else if (uriArg) {
-                [player setDataSourceURL:[NSURL URLWithString:uriArg] withKey:key withCertificateUrl:certificateUrl withLicenseUrl: licenseUrl withHeaders:headers withCache: useCache cacheKey:cacheKey cacheManager:_cacheManager overriddenDuration:overriddenDuration videoExtension: videoExtension];
+                [player setDataSourceURL:[NSURL URLWithString:uriArg] withKey:key withCertificateUrl:certificateUrl withLicenseUrl:licenseUrl withHeaders:headers withCache:useCache cacheKey:cacheKey cacheManager:_cacheManager overriddenDuration:overriddenDuration videoExtension:videoExtension];
             } else {
                 result(FlutterMethodNotImplemented);
             }
             result(nil);
         } else if ([@"dispose" isEqualToString:call.method]) {
+            [self bbb];
             [player clear];
             [self disposeNotificationData:player];
             [self setRemoteCommandsNotificationNotActive];
-
+            
             [player setOnBackgroundCountingListener:nil];
-
+            
             [_players removeObjectForKey:@(textureId)];
             // If the Flutter contains https://github.com/flutter/engine/pull/12695,
             // the `player` is disposed via `onTextureUnregistered` at the right time.
@@ -431,7 +468,7 @@ bool _remoteCommandsInitialized = false;
             // TODO(cyanglaz): Remove this dispatch block when
             // https://github.com/flutter/flutter/commit/8159a9906095efc9af8b223f5e232cb63542ad0b is in
             // stable And update the min flutter version of the plugin to the stable version.
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t) (1 * NSEC_PER_SEC)),
                            dispatch_get_main_queue(), ^{
                 if (!player.disposed) {
                     [player dispose];
@@ -450,6 +487,7 @@ bool _remoteCommandsInitialized = false;
         } else if ([@"play" isEqualToString:call.method]) {
             [self setupRemoteNotification:player];
             [player play];
+            [self aaa];
             result(nil);
         } else if ([@"position" isEqualToString:call.method]) {
             result(@([player position]));
@@ -463,78 +501,82 @@ bool _remoteCommandsInitialized = false;
             result(nil);
         } else if ([@"setSpeed" isEqualToString:call.method]) {
             [player setSpeed:[[argsMap objectForKey:@"speed"] doubleValue] result:result];
-        }else if ([@"setTrackParameters" isEqualToString:call.method]) {
+        } else if ([@"setTrackParameters" isEqualToString:call.method]) {
             int width = [argsMap[@"width"] intValue];
             int height = [argsMap[@"height"] intValue];
             int bitrate = [argsMap[@"bitrate"] intValue];
-
-            [player setTrackParameters:width: height : bitrate];
+            
+            [player setTrackParameters:width :height :bitrate];
             result(nil);
-        } else if ([@"enablePictureInPicture" isEqualToString:call.method]){
+        } else if ([@"enablePictureInPicture" isEqualToString:call.method]) {
             double left = [argsMap[@"left"] doubleValue];
             double top = [argsMap[@"top"] doubleValue];
             double width = [argsMap[@"width"] doubleValue];
             double height = [argsMap[@"height"] doubleValue];
-            NSLog(@"PictureInPicture === >> enablePictureInPicture ===>>%@",[NSString stringWithFormat:@"left:%lf top:%lf width:%lf height:%lf",
-                    left,top,width,height
-                    ]);
             [player enablePictureInPicture:CGRectMake(left, top, width, height)];
-        }  else if ([@"isPictureInPictureSupported" isEqualToString:call.method]){
-            if (@available(iOS 9.0, *)){
-                if ([AVPictureInPictureController isPictureInPictureSupported]){
+        }  else if ([@"enablePictureInPictureFrame" isEqualToString:call.method]) {
+            double left = [argsMap[@"left"] doubleValue];
+            double top = [argsMap[@"top"] doubleValue];
+            double width = [argsMap[@"width"] doubleValue];
+            double height = [argsMap[@"height"] doubleValue];
+            [player playerLayerSetup:CGRectMake(left, top, width, height)];
+        } else if ([@"isPictureInPictureSupported" isEqualToString:call.method]) {
+            if (@available(iOS 9.0, *)) {
+                if ([AVPictureInPictureController isPictureInPictureSupported]) {
                     result([NSNumber numberWithBool:true]);
                     return;
                 }
             }
-
+            
             result([NSNumber numberWithBool:false]);
-        } else if ([@"disablePictureInPicture" isEqualToString:call.method]){
+        } else if ([@"disablePictureInPicture" isEqualToString:call.method]) {
+
             [player disablePictureInPicture];
             [player setPictureInPicture:false];
-        } else if ([@"setAudioTrack" isEqualToString:call.method]){
-            NSString* name = argsMap[@"name"];
+        } else if ([@"setAudioTrack" isEqualToString:call.method]) {
+            NSString *name = argsMap[@"name"];
             int index = [argsMap[@"index"] intValue];
-            [player setAudioTrack:name index: index];
-        } else if ([@"setMixWithOthers" isEqualToString:call.method]){
+            [player setAudioTrack:name index:index];
+        } else if ([@"setMixWithOthers" isEqualToString:call.method]) {
             [player setMixWithOthers:[argsMap[@"mixWithOthers"] boolValue]];
-        } else if ([@"preCache" isEqualToString:call.method]){
-            NSDictionary* dataSource = argsMap[@"dataSource"];
-            NSString* urlArg = dataSource[@"uri"];
-            NSString* cacheKey = dataSource[@"cacheKey"];
-            NSDictionary* headers = dataSource[@"headers"];
-            NSNumber* maxCacheSize = dataSource[@"maxCacheSize"];
-            NSString* videoExtension = dataSource[@"videoExtension"];
+        } else if ([@"preCache" isEqualToString:call.method]) {
+            NSDictionary *dataSource = argsMap[@"dataSource"];
+            NSString *urlArg = dataSource[@"uri"];
+            NSString *cacheKey = dataSource[@"cacheKey"];
+            NSDictionary *headers = dataSource[@"headers"];
+            NSNumber *maxCacheSize = dataSource[@"maxCacheSize"];
+            NSString *videoExtension = dataSource[@"videoExtension"];
             
-            if (headers == [ NSNull null ]){
+            if (headers == [NSNull null]) {
                 headers = @{};
             }
-            if (videoExtension == [NSNull null]){
+            if (videoExtension == [NSNull null]) {
                 videoExtension = nil;
             }
             
-            if (urlArg != [NSNull null]){
-                NSURL* url = [NSURL URLWithString:urlArg];
-                if ([_cacheManager isPreCacheSupportedWithUrl:url videoExtension:videoExtension]){
+            if (urlArg != [NSNull null]) {
+                NSURL *url = [NSURL URLWithString:urlArg];
+                if ([_cacheManager isPreCacheSupportedWithUrl:url videoExtension:videoExtension]) {
                     [_cacheManager setMaxCacheSize:maxCacheSize];
-                    [_cacheManager preCacheURL:url cacheKey:cacheKey videoExtension:videoExtension withHeaders:headers completionHandler:^(BOOL success){
+                    [_cacheManager preCacheURL:url cacheKey:cacheKey videoExtension:videoExtension withHeaders:headers completionHandler:^(BOOL success) {
                     }];
                 } else {
                     NSLog(@"Pre cache is not supported for given data source.");
                 }
             }
             result(nil);
-        } else if ([@"clearCache" isEqualToString:call.method]){
+        } else if ([@"clearCache" isEqualToString:call.method]) {
             [_cacheManager clearCache];
             result(nil);
-        } else if ([@"stopPreCache" isEqualToString:call.method]){
-            NSString* urlArg = argsMap[@"url"];
-            NSString* cacheKey = argsMap[@"cacheKey"];
-            NSString* videoExtension = argsMap[@"videoExtension"];
-            if (urlArg != [NSNull null]){
-                NSURL* url = [NSURL URLWithString:urlArg];
-                if ([_cacheManager isPreCacheSupportedWithUrl:url videoExtension:videoExtension]){
+        } else if ([@"stopPreCache" isEqualToString:call.method]) {
+            NSString *urlArg = argsMap[@"url"];
+            NSString *cacheKey = argsMap[@"cacheKey"];
+            NSString *videoExtension = argsMap[@"videoExtension"];
+            if (urlArg != [NSNull null]) {
+                NSURL *url = [NSURL URLWithString:urlArg];
+                if ([_cacheManager isPreCacheSupportedWithUrl:url videoExtension:videoExtension]) {
                     [_cacheManager stopPreCache:url cacheKey:cacheKey
-                              completionHandler:^(BOOL success){
+                              completionHandler:^(BOOL success) {
                     }];
                 } else {
                     NSLog(@"Stop pre cache is not supported for given data source.");

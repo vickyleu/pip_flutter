@@ -53,6 +53,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void) setAudioTrack:(NSString*) name index:(int) index;
 - (void)setTrackParameters:(int) width: (int) height: (int)bitrate;
 - (void) enablePictureInPicture: (CGRect) frame;
+- (void) playerLayerSetup: (CGRect) frame;
 
 - (void)setPictureInPicture:(BOOL)pictureInPicture;
 - (void)disablePictureInPicture;

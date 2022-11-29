@@ -88,15 +88,22 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
       fit: BoxFit.contain,
     );
 
+    bool isReviewing = false;
+
     pipFlutterPlayerController = PipFlutterPlayerController(
         pipFlutterPlayerConfiguration,
         pipLifeCycleCallback: (open) {
-      print("PictureInPicture === >> fucker pipLifeCycleCallback:$open");
-      if (open) {
+          if (open) {
           pipFlutterPlayerController.enablePictureInPicture(pipFlutterPlayerKey);
-      } else {
-        pipFlutterPlayerController.disablePictureInPicture();
       }
+          else {
+            pipFlutterPlayerController.disablePictureInPicture();
+          }
+    },
+        pipFrameCallback: (){
+          if(!isReviewing){
+            pipFlutterPlayerController.enablePictureInPictureFrame(pipFlutterPlayerKey);
+          }
     },
         pipInBackgroundCallback: (position,duration){
           print("PictureInPicture === >>position=>$position duration=>$duration");
