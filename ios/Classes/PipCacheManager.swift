@@ -4,11 +4,11 @@ import HLSCachingReverseProxyServer
 import GCDWebServer
 import PINCache
 
-@objc public class CacheManager: NSObject {
+@objc(PipCacheManager) public class PipCacheManager: NSObject {
 
     // We store the last pre-cached CachingPlayerItem objects to be able to play even if the download
     // has not finished.
-    var _preCachedURLs = Dictionary<String, CachingPlayerItem>()
+    var _preCachedURLs = Dictionary<String, PipCachingPlayerItem>()
 
     var completionHandler: ((_ success:Bool) -> Void)? = nil
 
@@ -100,8 +100,8 @@ import PINCache
     
 
     // Get a CachingPlayerItem either from the network if it's not cached or from the cache.
-    @objc public func getCachingPlayerItem(_ url: URL, cacheKey: String?,videoExtension: String?, headers: Dictionary<NSObject,AnyObject>) -> CachingPlayerItem? {
-        let playerItem: CachingPlayerItem
+    @objc public func getCachingPlayerItem(_ url: URL, cacheKey: String?,videoExtension: String?, headers: Dictionary<NSObject,AnyObject>) -> PipCachingPlayerItem? {
+        let playerItem: PipCachingPlayerItem
         let _key: String = cacheKey ?? url.absoluteString
         // Fetch ongoing pre-cached url if it exists
         if self._preCachedURLs[_key] != nil {
@@ -116,13 +116,13 @@ import PINCache
                 let mimeTypeResult = getMimeType(url:url, explicitVideoExtension: videoExtension)
                 if (mimeTypeResult.1.isEmpty){
                     NSLog("Cache error: couldn't find mime type for url: \(url.absoluteURL). For this URL cache didn't work and video will be played without cache.")
-                    playerItem = CachingPlayerItem(url: url, cacheKey: _key, headers: headers)
+                    playerItem = PipCachingPlayerItem(url: url, cacheKey: _key, headers: headers)
                 } else {
-                    playerItem = CachingPlayerItem(data: data!, mimeType: mimeTypeResult.1, fileExtension: mimeTypeResult.0)
+                    playerItem = PipCachingPlayerItem(data: data!, mimeType: mimeTypeResult.1, fileExtension: mimeTypeResult.0)
                 }
             } else {
                 // The file is not cached.
-                playerItem = CachingPlayerItem(url: url, cacheKey: _key, headers: headers)
+                playerItem = PipCachingPlayerItem(url: url, cacheKey: _key, headers: headers)
                 self._existsInStorage = false
             }
         }
@@ -133,7 +133,7 @@ import PINCache
     // Remove all objects
     @objc public func clearCache(){
         try? storage?.removeAll()
-        self._preCachedURLs = Dictionary<String,CachingPlayerItem>()
+        self._preCachedURLs = Dictionary<String,PipCachingPlayerItem>()
     }
     
     private func getMimeType(url: URL, explicitVideoExtension: String?) -> (String,String){
@@ -204,21 +204,21 @@ import PINCache
 }
 
 // MARK: - CachingPlayerItemDelegate
-extension CacheManager: CachingPlayerItemDelegate {
-    func playerItem(_ playerItem: CachingPlayerItem, didFinishDownloadingData data: Data) {
+ extension PipCacheManager: CachingPlayerItemDelegate {
+    func playerItem(_ playerItem: PipCachingPlayerItem, didFinishDownloadingData data: Data) {
         // A track is downloaded. Saving it to the cache asynchronously.
         storage?.async.setObject(data, forKey: playerItem.cacheKey ?? playerItem.url.absoluteString, completion: { _ in })
         self.completionHandler?(true)
     }
 
-     func playerItem(_ playerItem: CachingPlayerItem, didDownloadBytesSoFar bytesDownloaded: Int, outOf bytesExpected: Int){
+    func playerItem(_ playerItem: PipCachingPlayerItem, didDownloadBytesSoFar bytesDownloaded: Int, outOf bytesExpected: Int){
         /// Is called every time a new portion of data is received.
         let percentage = Double(bytesDownloaded)/Double(bytesExpected)*100.0
         let str = String(format: "%.1f%%", percentage)
-        //NSLog("Downloading... %@", str)
+        NSLog("Downloading... %@", str)
     }
 
-    func playerItem(_ playerItem: CachingPlayerItem, downloadingFailedWith error: Error){
+    func playerItem(_ playerItem: PipCachingPlayerItem, downloadingFailedWith error: Error){
         /// Is called on downloading error.
         NSLog("Error when downloading the file %@", error as NSError);
         self.completionHandler?(false)

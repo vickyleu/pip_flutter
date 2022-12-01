@@ -15,25 +15,25 @@ fileprivate extension URL {
 @objc protocol CachingPlayerItemDelegate {
     
     /// Is called when the media file is fully downloaded.
-    @objc optional func playerItem(_ playerItem: CachingPlayerItem, didFinishDownloadingData data: Data)
+    @objc optional func playerItem(_ playerItem: PipCachingPlayerItem, didFinishDownloadingData data: Data)
     
     /// Is called every time a new portion of data is received.
-    @objc optional func playerItem(_ playerItem: CachingPlayerItem, didDownloadBytesSoFar bytesDownloaded: Int, outOf bytesExpected: Int)
+    @objc optional func playerItem(_ playerItem: PipCachingPlayerItem, didDownloadBytesSoFar bytesDownloaded: Int, outOf bytesExpected: Int)
     
     /// Is called after initial prebuffering is finished, means
     /// we are ready to play.
-    @objc optional func playerItemReadyToPlay(_ playerItem: CachingPlayerItem)
+    @objc optional func playerItemReadyToPlay(_ playerItem: PipCachingPlayerItem)
     
     /// Is called when the data being downloaded did not arrive in time to
     /// continue playback.
-    @objc optional func playerItemPlaybackStalled(_ playerItem: CachingPlayerItem)
+    @objc optional func playerItemPlaybackStalled(_ playerItem: PipCachingPlayerItem)
     
     /// Is called on downloading error.
-    @objc optional func playerItem(_ playerItem: CachingPlayerItem, downloadingFailedWith error: Error)
+    @objc optional func playerItem(_ playerItem: PipCachingPlayerItem, downloadingFailedWith error: Error)
     
 }
 
-open class CachingPlayerItem: AVPlayerItem {
+open class PipCachingPlayerItem: AVPlayerItem {
     
     class ResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelegate, URLSessionDelegate, URLSessionDataDelegate, URLSessionTaskDelegate {
         
@@ -44,7 +44,7 @@ open class CachingPlayerItem: AVPlayerItem {
         var mediaData: Data?
         var response: URLResponse?
         var pendingRequests = Set<AVAssetResourceLoadingRequest>()
-        weak var owner: CachingPlayerItem?
+        weak var owner: PipCachingPlayerItem?
         
         func resourceLoader(_ resourceLoader: AVAssetResourceLoader, shouldWaitForLoadingOfRequestedResource loadingRequest: AVAssetResourceLoadingRequest) -> Bool {
             if playingFromData {

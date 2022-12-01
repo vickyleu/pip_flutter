@@ -1,13 +1,29 @@
 
 #import "PipFlutterPlugin.h"
+
+#if __has_include(<pip_flutter/pip_flutter-Swift.h>)
 #import <pip_flutter/pip_flutter-Swift.h>
+#else
+// Support project import fallback if the generated compatibility header
+// is not copied when this plugin is created as a library.
+// https://forums.swift.org/t/swift-static-libraries-dont-copy-generated-objective-c-header/19816
+#import "pip_flutter-Swift.h"
+#endif
+
 #import <Aspects/Aspects.h>
+#import <Foundation/Foundation.h>
+#import <AVKit/AVKit.h>
+#import <AVFoundation/AVFoundation.h>
+#import <GLKit/GLKit.h>
+#import "PipFlutterTimeUtils.h"
+#import "PipFlutter.h"
+#import <MediaPlayer/MediaPlayer.h>
 
 #if !__has_feature(objc_arc)
 #error Code Requires ARC.
 #endif
 
-@interface PipFlutterPlugin ()
+@interface PipFlutterPlugin()
 @property(nonatomic, strong) FlutterMethodChannel *channel;
 @property(nonatomic, assign) UIBackgroundTaskIdentifier bgTask;
 @property(nonatomic, assign) BOOL isInPipMode;
@@ -21,7 +37,7 @@ static PipFlutterPlugin *_sharedInstance = nil;
 NSMutableDictionary *_dataSourceDict;
 NSMutableDictionary *_timeObserverIdDict;
 NSMutableDictionary *_artworkImageDict;
-CacheManager *_cacheManager;
+PipCacheManager *_cacheManager;
 int texturesCount = -1;
 PipFlutter *_notificationPlayer;
 bool _remoteCommandsInitialized = false;
@@ -139,7 +155,7 @@ bool _remoteCommandsInitialized = false;
     _timeObserverIdDict = [NSMutableDictionary dictionary];
     _artworkImageDict = [NSMutableDictionary dictionary];
     _dataSourceDict = [NSMutableDictionary dictionary];
-    _cacheManager = [[CacheManager alloc] init];
+    _cacheManager = [[PipCacheManager alloc] init];
     [_cacheManager setup];
     return self;
 }
