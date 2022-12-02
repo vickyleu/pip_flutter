@@ -16,7 +16,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
     static var _sharedInstance: SwiftPipFlutterPlugin?
 
     private lazy var channel: FlutterMethodChannel = {
-        return FlutterMethodChannel.init(name: "pipflutter_player_channel", binaryMessenger: registrar.messenger())
+        FlutterMethodChannel.init(name: "pipflutter_player_channel", binaryMessenger: registrar.messenger())
     }()
 
     var _dataSourceDict = Dictionary<Int, Dictionary<String, AnyObject>>()
