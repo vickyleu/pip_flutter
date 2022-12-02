@@ -49,8 +49,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)initWithFrame:(CGRect)frame;
 - (void)setMixWithOthers:(bool)mixWithOthers;
 - (void)seekTo:(int)location;
-- (void)setDataSourceAsset:(NSString*)asset withKey:(NSString*)key withCertificateUrl:(NSString*)certificateUrl withLicenseUrl:(NSString*)licenseUrl cacheKey:(NSString*)cacheKey cacheManager:(PipCacheManager*)cacheManager overriddenDuration:(int) overriddenDuration;
-- (void)setDataSourceURL:(NSURL*)url withKey:(NSString*)key withCertificateUrl:(NSString*)certificateUrl withLicenseUrl:(NSString*)licenseUrl withHeaders:(NSDictionary*)headers withCache:(BOOL)useCache cacheKey:(NSString*)cacheKey cacheManager:(PipCacheManager*)cacheManager overriddenDuration:(int) overriddenDuration videoExtension: (NSString*) videoExtension;
+- (void)setDataSourceAsset:(NSString*)asset withKey:(NSString*)key withCertificateUrl:(nullable NSString*  )certificateUrl withLicenseUrl:(nullable NSString*  )licenseUrl cacheKey:(nullable NSString*  )cacheKey cacheManager:(PipCacheManager*)cacheManager overriddenDuration:(int) overriddenDuration;
+- (void)setDataSourceURL:(NSURL*)url withKey:(NSString*)key withCertificateUrl:(nullable NSString* )certificateUrl withLicenseUrl:(nullable NSString* )licenseUrl withHeaders:(nullable NSDictionary* )headers withCache:(BOOL)useCache cacheKey:(nullable NSString* )cacheKey cacheManager:(PipCacheManager*)cacheManager overriddenDuration:(int) overriddenDuration videoExtension: (nullable NSString*) videoExtension;
 - (void)setVolume:(double)volume;
 - (void)setSpeed:(double)speed result:(FlutterResult)result;
 - (void) setAudioTrack:(NSString*) name index:(int) index;
@@ -67,7 +67,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)disposeSansEventChannel;
 - (void)dispose;
 
-- (void)setOnBackgroundCountingListener:(void (^)(void))pFunction;
+- (void)setOnBackgroundCountingListener:(nullable void (^)(void) )pFunction;
 @end
 
 NS_ASSUME_NONNULL_END
