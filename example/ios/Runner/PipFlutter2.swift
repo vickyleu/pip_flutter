@@ -20,12 +20,12 @@ import pip_flutter
  private var playbackBufferFullContextRef = UnsafeRawPointer(bitPattern: 1)!
  private var presentationSizeContextRef = UnsafeRawPointer(bitPattern: 1)!
 
- private let timeRangeContext = withUnsafePointer(to: &timeRangeContextRef) { UnsafeRawPointer($0) }
- private let statusContext = withUnsafePointer(to: &statusContextRef) { UnsafeRawPointer($0) }
- private let playbackLikelyToKeepUpContext = withUnsafePointer(to: &playbackLikelyToKeepUpContextRef) { UnsafeRawPointer($0) }
- private let playbackBufferEmptyContext = withUnsafePointer(to: &playbackBufferEmptyContextRef) { UnsafeRawPointer($0) }
- private let playbackBufferFullContext = withUnsafePointer(to: &playbackBufferFullContextRef) { UnsafeRawPointer($0) }
- private let presentationSizeContext = withUnsafePointer(to: &presentationSizeContextRef) { UnsafeRawPointer($0) }
+ private let timeRangeContext = withUnsafeMutablePointer(to: &timeRangeContextRef) { UnsafeMutablePointer($0) }
+ private let statusContext = withUnsafeMutablePointer(to: &statusContextRef) { UnsafeMutablePointer($0) }
+ private let playbackLikelyToKeepUpContext = withUnsafeMutablePointer(to: &playbackLikelyToKeepUpContextRef) { UnsafeMutablePointer($0) }
+ private let playbackBufferEmptyContext = withUnsafeMutablePointer(to: &playbackBufferEmptyContextRef) { UnsafeMutablePointer($0) }
+ private let playbackBufferFullContext = withUnsafeMutablePointer(to: &playbackBufferFullContextRef) { UnsafeMutablePointer($0) }
+ private let presentationSizeContext = withUnsafeMutablePointer(to: &presentationSizeContextRef) { UnsafeMutablePointer($0) }
 
 
 
@@ -44,6 +44,24 @@ public class PipFlutter2 : NSObject, FlutterPlatformView, FlutterStreamHandler, 
     private(set) var disposed:Bool=false
     private var eventSink:FlutterEventSink?
     
+    private(set) var isPlaying=false
+    private(set) var isPiping=false
+    var isLooping=false
+    private(set)var isInitialized=false
+    private(set) var key:String?
+    private(set) var failedCount:Int=0
+    var playerLayer:AVPlayerLayer?
+    var pictureInPicture=false
+    var observersAdded=false
+    
+     var stalledCount:Int = 0
+     var isStalledCheckStarted=false
+     var playerRate:Float = 1
+    
+     var overriddenDuration=0
+    var _lastAvPlayerTimeControlStatus:AVPlayer.TimeControlStatus?
+    
+    
     public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
         self.eventSink = events
         // TODO(@recastrodiaz): remove the line below when the race condition is resolved:
@@ -60,162 +78,99 @@ public class PipFlutter2 : NSObject, FlutterPlatformView, FlutterStreamHandler, 
         return nil
     }
     
-   
     
-    private var _isPlaying:Bool
-    var isPlaying:Bool {
-        get { return _isPlaying }
-    }
-    private(set) var isPiping:Bool
-    private var _isLooping:Bool
-    var isLooping:Bool {
-        get { return _isLooping }
-        set(isLooping) {
-            _isLooping = isLooping
-        }
-    }
-    private var _isInitialized:Bool
-    var isInitialized:bool {
-        get { return _isInitialized }
-    }
-    private var _key:String
-    var key:String {
-        get { return _key }
-    }
-    private var _failedCount:Int
-    var failedCount:Int {
-        get { return _failedCount }
-    }
-    var _playerLayer:AVPlayerLayer
-    var _pictureInPicture:bool
-    var _observersAdded:bool
-    private var _stalledCount:Int
-    var stalledCount:Int {
-        get { return _stalledCount }
-        set { _stalledCount = newValue }
-    }
-    private var _isStalledCheckStarted:bool
-    var isStalledCheckStarted:bool {
-        get { return _isStalledCheckStarted }
-        set { _isStalledCheckStarted = newValue }
-    }
-    private var _playerRate:Float
-    var playerRate:Float {
-        get { return _playerRate }
-        set { _playerRate = newValue }
-    }
-    private var _overriddenDuration:Int
-    var overriddenDuration:Int {
-        get { return _overriddenDuration }
-        set { _overriddenDuration = newValue }
-    }
-    private var _lastAvPlayerTimeControlStatus:AVPlayerTimeControlStatus
-    var lastAvPlayerTimeControlStatus:AVPlayerTimeControlStatus {
-        get { return _lastAvPlayerTimeControlStatus }
-        set { _lastAvPlayerTimeControlStatus = newValue }
-    }
-    private var _lis:(Void)->Void
-    private var lis:(Void)->Void {
-        get { return _lis }
-        set { _lis = newValue }
-    }
+    
+    
+   
+   
+    var lis:(()->Void)?
+    
 
     init(frame:CGRect) {
-        self = super.init()
-        NSAssert(self, "super init cannot be nil")
-        _isInitialized = false
-        _isPlaying = false
-        _disposed = false
-        _player = AVPlayer()
-        _player.actionAtItemEnd = AVPlayerActionAtItemEndNone
+        super.init()
+        self.player.actionAtItemEnd = .none
         ///Fix for loading large videos
         if #available(iOS 10.0, *) {
-            _player.automaticallyWaitsToMinimizeStalling = false
+            self.player.automaticallyWaitsToMinimizeStalling = false
         }
-        self._observersAdded = false
-        return self
+        self.observersAdded = false
     }
 
-    func view() -> UIView {
+    public func view() -> UIView {
         let playerView:PipFlutterView! = PipFlutterView(frame:CGRectZero)
-        playerView.player = _player
+        playerView.player = self.player
         return playerView
     }
 
     func addObservers(item:AVPlayerItem!) {
-        if !self._observersAdded {
-            _player.addObserver(self, forKeyPath:"rate", options:0, context:nil)
-            item.addObserver(self, forKeyPath:"loadedTimeRanges", options:0, context:timeRangeContext)
-            item.addObserver(self, forKeyPath:"status", options:0, context:statusContext)
-            item.addObserver(self, forKeyPath:"presentationSize", options:0, context:presentationSizeContext)
+        if !self.observersAdded {
+            player.addObserver(self, forKeyPath:"rate", options:.new, context:nil)
+            item.addObserver(self, forKeyPath:"loadedTimeRanges", options:.new, context:timeRangeContext)
+            item.addObserver(self, forKeyPath:"status", options:.new, context:statusContext)
+            item.addObserver(self, forKeyPath:"presentationSize", options:.new, context:presentationSizeContext)
             item.addObserver(self,
                    forKeyPath:"playbackLikelyToKeepUp",
-                      options:0,
+                      options:.new,
                       context:playbackLikelyToKeepUpContext)
             item.addObserver(self,
                    forKeyPath:"playbackBufferEmpty",
-                      options:0,
+                      options:.new,
                       context:playbackBufferEmptyContext)
             item.addObserver(self,
                    forKeyPath:"playbackBufferFull",
-                      options:0,
+                      options:.new,
                       context:playbackBufferFullContext)
-            NSNotificationCenter.defaultCenter().addObserver(self,
+            NotificationCenter.default.addObserver(self,
                                                      selector:Selector("itemDidPlayToEndTime:"),
-                                                         name:AVPlayerItemDidPlayToEndTimeNotification,
+                                                     name:NSNotification.Name.AVPlayerItemDidPlayToEndTime,
                                                        object:item)
-            self._observersAdded = true
+            self.observersAdded = true
         }
     }
 
     func clear() {
-        _isInitialized = false
-        _isPlaying = false
-        _disposed = false
-        _failedCount = 0
-        _key = nil
-        if _player.currentItem == nil {
+        isInitialized = false
+        isPlaying = false
+        disposed = false
+        failedCount = 0
+        key = nil
+        if player.currentItem == nil {
             return
         }
-
-        if _player.currentItem == nil {
-            return
-        }
-
         self.removeObservers()
-        let asset:AVAsset! = _player.currentItem.asset()
-        asset.cancelLoading()
+        let asset = player.currentItem?.asset
+        asset?.cancelLoading()
     }
 
     func removeObservers() {
-        if self._observersAdded {
-            _player.removeObserver(self, forKeyPath:"rate", context:nil)
-            _player.currentItem().removeObserver(self, forKeyPath:"status", context:statusContext)
-            _player.currentItem().removeObserver(self, forKeyPath:"presentationSize", context:presentationSizeContext)
-            _player.currentItem().removeObserver(self,
+        if self.observersAdded {
+            player.removeObserver(self, forKeyPath:"rate", context:nil)
+            player.currentItem?.removeObserver(self, forKeyPath:"status", context:statusContext)
+            player.currentItem?.removeObserver(self, forKeyPath:"presentationSize", context:presentationSizeContext)
+            player.currentItem?.removeObserver(self,
                                        forKeyPath:"loadedTimeRanges",
                                           context:timeRangeContext)
-            _player.currentItem().removeObserver(self,
+            player.currentItem?.removeObserver(self,
                                        forKeyPath:"playbackLikelyToKeepUp",
                                           context:playbackLikelyToKeepUpContext)
-            _player.currentItem().removeObserver(self,
+            player.currentItem?.removeObserver(self,
                                        forKeyPath:"playbackBufferEmpty",
                                           context:playbackBufferEmptyContext)
-            _player.currentItem().removeObserver(self,
+            player.currentItem?.removeObserver(self,
                                        forKeyPath:"playbackBufferFull",
                                           context:playbackBufferFullContext)
-            NSNotificationCenter.defaultCenter().removeObserver(self)
-            self._observersAdded = false
+            NotificationCenter.default.removeObserver(self)
+            self.observersAdded = false
         }
     }
 
-    func itemDidPlayToEndTime(notification:NSNotification!) {
-        if _isLooping {
-            let p:AVPlayerItem! = notification.object()
-            p.seekToTime(kCMTimeZero, completionHandler:nil)
+    func itemDidPlayToEndTime(notification:NSNotification) {
+        if self.isLooping {
+            let p = notification.object as! AVPlayerItem
+            p.seek(to: CMTime.zero, completionHandler:nil)
         } else {
-            if (_eventSink != nil) {
-                _eventSink(["event" : "completed", "key" : _key])
+            if (eventSink != nil) {
+                eventSink!(["event" : "completed", "key" : self.key])
                 self.removeObservers()
             }
             self.completed()
@@ -223,15 +178,13 @@ public class PipFlutter2 : NSObject, FlutterPlatformView, FlutterStreamHandler, 
     }
 
     func completed() {
-        if (_lis != nil) {
-            _lis()
-        }
+        lis?()
     }
 
 
-    func radiansToDegrees(radians:CGFloat) -> CGFloat {
+    func radiansToDegrees(radians:Float) -> Float {
         // Input range [-pi, pi] or [-180, 180]
-        let degrees:CGFloat = GLKMathRadiansToDegrees((radians as! float))
+        let degrees = GLKMathRadiansToDegrees(radians)
         if degrees < 0 {
             // Convert -90 to 270 and -180 to 180
             return degrees + 360
