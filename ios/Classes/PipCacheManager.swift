@@ -53,7 +53,7 @@ import PINCache
     }
 
     // MARK: - Logic
-    @objc public func preCacheURL(_ url: URL, cacheKey: String?, videoExtension: String?, withHeaders headers: Dictionary<NSObject,AnyObject>, completionHandler: ((_ success:Bool) -> Void)?) {
+    @objc public func preCacheURL(_ url: URL, cacheKey: String?, videoExtension: String?, withHeaders headers: Dictionary<String,AnyObject>, completionHandler: ((_ success:Bool) -> Void)?) {
         self.completionHandler = completionHandler
         
         let _key: String = cacheKey ?? url.absoluteString
@@ -87,7 +87,7 @@ import PINCache
     }
     
     ///Gets caching player item for normal playback.
-    @objc public func getCachingPlayerItemForNormalPlayback(_ url: URL, cacheKey: String?, videoExtension: String?, headers: Dictionary<NSObject,AnyObject>) -> AVPlayerItem? {
+    @objc public func getCachingPlayerItemForNormalPlayback(_ url: URL, cacheKey: String?, videoExtension: String?, headers: Dictionary<String,AnyObject>) -> AVPlayerItem? {
         let mimeTypeResult = getMimeType(url:url, explicitVideoExtension: videoExtension)
         if (mimeTypeResult.1 == "application/vnd.apple.mpegurl"){
             let reverseProxyURL = server?.reverseProxyURL(from: url)!
@@ -100,7 +100,7 @@ import PINCache
     
 
     // Get a CachingPlayerItem either from the network if it's not cached or from the cache.
-    @objc public func getCachingPlayerItem(_ url: URL, cacheKey: String?,videoExtension: String?, headers: Dictionary<NSObject,AnyObject>) -> PipCachingPlayerItem? {
+    @objc public func getCachingPlayerItem(_ url: URL, cacheKey: String?,videoExtension: String?, headers: Dictionary<String,AnyObject>) -> PipCachingPlayerItem? {
         let playerItem: PipCachingPlayerItem
         let _key: String = cacheKey ?? url.absoluteString
         // Fetch ongoing pre-cached url if it exists

@@ -254,22 +254,22 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         commandCenter.togglePlayPauseCommand.addTarget { event in
             if self._notificationPlayer != nil {
                 if self._notificationPlayer!.isPlaying {
-                    self._notificationPlayer!.eventSink(["event": "play"])
+                    self._notificationPlayer!.eventSink?(["event": "play"])
                 } else {
-                    self._notificationPlayer!.eventSink(["event": "pause"])
+                    self._notificationPlayer!.eventSink?(["event": "pause"])
                 }
             }
             return .success
         }
         commandCenter.playCommand.addTarget { event in
             if self._notificationPlayer != nil {
-                self._notificationPlayer!.eventSink(["event": "play"])
+                self._notificationPlayer!.eventSink?(["event": "play"])
             }
             return .success
         }
         commandCenter.pauseCommand.addTarget { event in
             if self._notificationPlayer != nil {
-                self._notificationPlayer!.eventSink(["event": "pause"])
+                self._notificationPlayer!.eventSink?(["event": "pause"])
             }
             return .success
         }
@@ -282,8 +282,8 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
 
                     let time: CMTime = CMTimeMake(value: Int64(playbackEvent.positionTime), timescale: 1)
                     let millis = PipFlutterTimeUtils.fltcmTime(toMillis: (time))
-                    self._notificationPlayer!.seek(to: Int32(millis))
-                    self._notificationPlayer!.eventSink(["event": "seek", "position": millis])
+                    self._notificationPlayer!.seekTo(location:  Int((millis)))
+                    self._notificationPlayer!.eventSink?(["event": "seek", "position": millis])
                 }
                 return .success
             }
@@ -451,15 +451,11 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                     } else {
                         assetPath = registrar.lookupKey(forAsset: assetArg!)
                     }
-                    player.setDataSourceAsset(assetPath, withKey: key,
-                            withCertificateUrl: certificateUrl, withLicenseUrl: licenseUrl,
-                            cacheKey: cacheKey, cacheManager: _cacheManager,
-                                              overriddenDuration: Int32(overriddenDuration)
-                    )
+                    player.setDataSourceAsset(asset: assetPath, withKey: key, withCertificateUrl: certificateUrl, withLicenseUrl: licenseUrl, cacheKey: cacheKey, cacheManager: _cacheManager, overriddenDuration: overriddenDuration)
+                   
                 } else if (uriArg != nil) {
-                    player.setDataSourceURL(URL.init(string: uriArg!)!, withKey: key, withCertificateUrl: certificateUrl,
-                            withLicenseUrl: licenseUrl, withHeaders: headers, withCache: useCache, cacheKey: cacheKey,
-                                            cacheManager: _cacheManager, overriddenDuration: Int32(overriddenDuration), videoExtension: videoExtension)
+                    
+                    player.setDataSourceURL(url: URL.init(string: uriArg!)!, withKey: key, withCertificateUrl: certificateUrl, withLicenseUrl: licenseUrl, withHeaders: headers!, withCache: useCache, cacheKey: cacheKey, cacheManager: _cacheManager, overriddenDuration: overriddenDuration, videoExtension: videoExtension)
                 } else {
                     result(FlutterMethodNotImplemented)
                     return
@@ -518,7 +514,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 result(player.absolutePosition())
                 break
             case "seekTo":
-                player.seek(to: Int32(argsMap["location"] as! Int))
+                player.seekTo(location: argsMap["location"] as! Int)
                 result(nil)
                 break
             case "pause":
@@ -532,7 +528,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 let width = argsMap["width"] as! Int
                 let height = argsMap["height"] as! Int
                 let bitrate = argsMap["bitrate"] as! Int
-                player.setTrackParameters(Int32(width), Int32(height), Int32(bitrate))
+                player.setTrackParameters(width, height, bitrate)
                 result(nil)
                 break
             case "enablePictureInPicture":
@@ -540,7 +536,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 let top = argsMap["top"] as! Double
                 let width = argsMap["width"] as! Double
                 let height = argsMap["height"] as! Double
-                player.enablePicture(inPicture: CGRect.init(x: left, y: top, width: width, height: height))
+                player.enablePictureInPicture(frame: CGRect.init(x: left, y: top, width: width, height: height))
                 result(nil)
                 break
             case "enablePictureInPictureFrame":
@@ -548,7 +544,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 let top = argsMap["top"] as! Double
                 let width = argsMap["width"] as! Double
                 let height = argsMap["height"] as! Double
-                player.playerLayerSetup(CGRect.init(x: left, y: top, width: width, height: height))
+                player.playerLayerSetup(frame: CGRect.init(x: left, y: top, width: width, height: height))
                 result(nil)
                 break
             case "isPictureInPictureSupported":
@@ -562,13 +558,13 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 break
             case "disablePictureInPicture":
                 player.disablePictureInPicture()
-                player.setPictureInPicture(false)
+                player.setPictureInPicture(pictureInPicture: false)
                 result(nil)
                 break
             case "setAudioTrack":
                 let name = argsMap["name"] as! String
                 let index = argsMap["index"] as! Int
-                player.setAudioTrack(name, index: Int32(index))
+                player.setAudioTrack(name, index: index)
                 result(nil)
                 break
             case "setMixWithOthers":
@@ -579,7 +575,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 let dataSource = argsMap["dataSource"] as! Dictionary<String,AnyObject>
                 let urlArg = dataSource["uri"] as? String
                 let cacheKey = dataSource["cacheKey"] as? String
-                var headers = dataSource["headers"]as? Dictionary<NSObject,AnyObject>
+                var headers = dataSource["headers"]as? Dictionary<String,AnyObject>
                 let maxCacheSize = dataSource["maxCacheSize"] as? Int
                 var videoExtension = dataSource["videoExtension"] as? String
 

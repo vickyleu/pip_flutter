@@ -40,7 +40,7 @@ open class PipCachingPlayerItem: AVPlayerItem {
         var playingFromData = false
         var mimeType: String? // is required when playing from Data
         var session: URLSession?
-        var headers: Dictionary<NSObject,AnyObject>?
+        var headers: Dictionary<String,AnyObject>?
         var mediaData: Data?
         var response: URLResponse?
         var pendingRequests = Set<AVAssetResourceLoadingRequest>()
@@ -198,13 +198,13 @@ open class PipCachingPlayerItem: AVPlayerItem {
     private let cachingPlayerItemScheme = "cachingPlayerItemScheme"
     
     /// Is used for playing remote files.
-    convenience init(url: URL, cacheKey: String?, headers: Dictionary<NSObject,AnyObject>) {
+    convenience init(url: URL, cacheKey: String?, headers: Dictionary<String,AnyObject>) {
         self.init(url: url, customFileExtension: nil, cacheKey: cacheKey, headers: headers)
     }
     
     /// Override/append custom file extension to URL path.
     /// This is required for the player to work correctly with the intended file type.
-    init(url: URL, customFileExtension: String?, cacheKey: String?, headers: Dictionary<NSObject,AnyObject>) {
+    init(url: URL, customFileExtension: String?, cacheKey: String?, headers: Dictionary<String,AnyObject>) {
         self.cacheKey = cacheKey
         self.url = url
         self.resourceLoaderDelegate.headers = headers
