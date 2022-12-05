@@ -17,6 +17,7 @@ import 'package:pip_flutter/pipflutter_player_with_controls.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'package:wakelock/wakelock.dart';
 
+export 'package:pip_flutter/pipflutter_player_notification_configuration.dart';
 export 'package:pip_flutter/pipflutter_player_controls_configuration.dart';
 export 'package:pip_flutter/pipflutter_player_configuration.dart';
 export 'package:pip_flutter/pipflutter_player_controller.dart';

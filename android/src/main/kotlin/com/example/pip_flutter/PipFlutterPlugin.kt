@@ -107,7 +107,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-        Log.e("CALLMETHOD", "onMethodCall: call.method --> " + call.method)
+//        Log.e("CALLMETHOD", "onMethodCall: call.method --> " + call.method)
 //        Log.e("CALLMETHOD", "onMethodCall: result --> $result")
         if (flutterState == null || flutterState!!.textureRegistry == null) {
             result.error(
@@ -167,6 +167,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
         if (activity != this.activity || !isPictureInPictureSupported()) return
         val player = videoPlayers.valueAt(0)
         if (player.isPlaying() && !player.isPiping()) {
+            Log.e(TAG, "onActivityPaused")
             flutterState!!.invokeMethod("prepareToPip")
         }
     }

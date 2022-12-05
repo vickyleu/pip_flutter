@@ -122,7 +122,9 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
           author: '漫威宇宙',
           imageUrl:
               'https://img0.baidu.com/it/u=248545255,575820690&fm=253&fmt=auto&app=138&f=JPEG',
-        )));
+        )
+    )
+    );
     pipFlutterPlayerController
         .setPipFlutterPlayerGlobalKey(pipFlutterPlayerKey);
     super.initState();

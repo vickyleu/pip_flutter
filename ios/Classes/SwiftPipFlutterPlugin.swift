@@ -68,14 +68,13 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         }
         do {
             let controller = UIApplication.shared.keyWindow?.rootViewController as! FlutterViewController
-            
-            self.aspect = try controller.aspect_hook(selector: #selector(FlutterViewController.viewDidLayoutSubviews), options: .positionInstead, usingBlock: { info in
+            self.aspect = try controller.aspect_hook(selector: #selector(FlutterViewController.viewWillLayoutSubviews), options: .positionInstead, usingBlock: { info in
                 if !self.isInPipMode {
                     let controller = UIApplication.shared.keyWindow?.rootViewController as! FlutterViewController
                     if self.players.count != 1 {
                         return
                     }
-                    if !controller.isEqual(FlutterViewController.self) {
+                    if !controller.isKind(of: FlutterViewController.self) {
                         return
                     }
                     let players = self.players.map {

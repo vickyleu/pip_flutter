@@ -85,11 +85,16 @@ class _PipFlutterPlayerSubtitlesDrawerState
 
   ///Called when player state has changed, i.e. new player position, etc.
   void _updateState() {
-    if (mounted) {
-      setState(() {
-        _latestValue =
-            widget.pipFlutterPlayerController.videoPlayerController!.value;
-      });
+    try{
+      if (mounted) {
+        setState(() {
+          _latestValue =
+              widget.pipFlutterPlayerController.videoPlayerController!.value;
+        });
+      }
+    }catch (e){
+      _latestValue =
+          widget.pipFlutterPlayerController.videoPlayerController!.value;
     }
   }
 
