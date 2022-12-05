@@ -4,6 +4,7 @@ import AVKit
 import AVFoundation
 import GLKit
 
+
 public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFactory {
 
     private var players = Dictionary<Int, PipFlutter>.init(minimumCapacity: 1)
@@ -62,33 +63,34 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         return player!
     }
 
+    
+    
     func aaa() {
         if self.aspect != nil {
             return
         }
         do {
-            let controller = UIApplication.shared.keyWindow?.rootViewController as! FlutterViewController
-            self.aspect = try controller.aspect_hook(selector: #selector(FlutterViewController.viewWillLayoutSubviews), options: .positionInstead, usingBlock: { info in
-                if !self.isInPipMode {
-                    let controller = UIApplication.shared.keyWindow?.rootViewController as! FlutterViewController
-                    if self.players.count != 1 {
+            // 拿到需要插入执行的 block
+            let wrappedBlock: @convention(block) (AspectInfo) -> Void = { (info:AspectInfo) in
+                if !self.isInPipMode{
+                    guard let controller:FlutterViewController  = UIApplication.shared.keyWindow?.rootViewController as? FlutterViewController else {return}
+                    if self.players.count != 1{
                         return
                     }
-                    if !controller.isKind(of: FlutterViewController.self) {
+                    if !controller.isKind(of: FlutterViewController.self){
                         return
                     }
-                    let players = self.players.map {
-                        $0.1
-                    }
-                    let player = players.last
-                    if player != nil && player!.isPlaying && !player!.isPiping {
-                        print("preparePipFrame")
+                    let players = self.players.map{$0.1}
+                    guard let player:PipFlutter  = players.last else {return}
+                    if player.isPlaying && !player.isPiping {
                         self.channel.invokeMethod("preparePipFrame", arguments: nil)
                         self.isInPipMode = true
                     }
                 }
-            })
-           
+            }
+            let wrappedObject: AnyObject = unsafeBitCast(wrappedBlock, to: AnyObject.self)
+            
+            self.aspect = try FlutterViewController.aspect_hook(#selector(FlutterViewController.viewWillLayoutSubviews),with: .positionAfter, usingBlock: wrappedObject)
         } catch let error {
             print("\(error.localizedDescription)")
         }
