@@ -4,7 +4,7 @@ import HLSCachingReverseProxyServer
 import GCDWebServer
 import PINCache
 
-@objc(PipCacheManager) public class PipCacheManager: NSObject {
+public class PipCacheManager{
 
     // We store the last pre-cached CachingPlayerItem objects to be able to play even if the download
     // has not finished.
@@ -36,7 +36,7 @@ import PINCache
     
 
     ///Setups cache server for HLS streams
-    @objc public func setup(){
+    public func setup(){
         GCDWebServer.setLogLevel(4)
         let webServer = GCDWebServer()
         let cache = PINCache.shared
@@ -45,7 +45,7 @@ import PINCache
         server?.start(port: 8080)
     }
     
-    @objc public func setMaxCacheSize(_ maxCacheSize: NSNumber?){
+    public func setMaxCacheSize(_ maxCacheSize: NSNumber?){
         if let unsigned = maxCacheSize {
             let _maxCacheSize = unsigned.uintValue
             diskConfig = DiskConfig(name: "PipFlutterCache", expiry: .date(Date().addingTimeInterval(3600*24*30)), maxSize: _maxCacheSize)
@@ -53,7 +53,7 @@ import PINCache
     }
 
     // MARK: - Logic
-    @objc public func preCacheURL(_ url: URL, cacheKey: String?, videoExtension: String?, withHeaders headers: Dictionary<String,AnyObject>, completionHandler: ((_ success:Bool) -> Void)?) {
+    public func preCacheURL(_ url: URL, cacheKey: String?, videoExtension: String?, withHeaders headers: Dictionary<String,AnyObject>, completionHandler: ((_ success:Bool) -> Void)?) {
         self.completionHandler = completionHandler
         
         let _key: String = cacheKey ?? url.absoluteString
@@ -74,7 +74,7 @@ import PINCache
         }
     }
     
-    @objc public func stopPreCache(_ url: URL, cacheKey: String?, completionHandler: ((_ success:Bool) -> Void)?){
+    public func stopPreCache(_ url: URL, cacheKey: String?, completionHandler: ((_ success:Bool) -> Void)?){
         let _key: String = cacheKey ?? url.absoluteString
         if self._preCachedURLs[_key] != nil {
             let playerItem = self._preCachedURLs[_key]!
@@ -87,7 +87,7 @@ import PINCache
     }
     
     ///Gets caching player item for normal playback.
-    @objc public func getCachingPlayerItemForNormalPlayback(_ url: URL, cacheKey: String?, videoExtension: String?, headers: Dictionary<String,AnyObject>) -> AVPlayerItem? {
+    public func getCachingPlayerItemForNormalPlayback(_ url: URL, cacheKey: String?, videoExtension: String?, headers: Dictionary<String,AnyObject>) -> AVPlayerItem? {
         let mimeTypeResult = getMimeType(url:url, explicitVideoExtension: videoExtension)
         if (mimeTypeResult.1 == "application/vnd.apple.mpegurl"){
             let reverseProxyURL = server?.reverseProxyURL(from: url)!
@@ -100,7 +100,7 @@ import PINCache
     
 
     // Get a CachingPlayerItem either from the network if it's not cached or from the cache.
-    @objc public func getCachingPlayerItem(_ url: URL, cacheKey: String?,videoExtension: String?, headers: Dictionary<String,AnyObject>) -> PipCachingPlayerItem? {
+    public func getCachingPlayerItem(_ url: URL, cacheKey: String?,videoExtension: String?, headers: Dictionary<String,AnyObject>) -> PipCachingPlayerItem? {
         let playerItem: PipCachingPlayerItem
         let _key: String = cacheKey ?? url.absoluteString
         // Fetch ongoing pre-cached url if it exists
@@ -131,7 +131,7 @@ import PINCache
     }
     
     // Remove all objects
-    @objc public func clearCache(){
+    public func clearCache(){
         try? storage?.removeAll()
         self._preCachedURLs = Dictionary<String,PipCachingPlayerItem>()
     }
@@ -197,7 +197,7 @@ import PINCache
     }
     
     ///Checks wheter pre cache is supported for given url.
-    @objc public func isPreCacheSupported(url: URL, videoExtension: String?) -> Bool{
+   public func isPreCacheSupported(url: URL, videoExtension: String?) -> Bool{
         let mimeTypeResult = getMimeType(url:url, explicitVideoExtension: videoExtension)
         return !mimeTypeResult.1.isEmpty && mimeTypeResult.1 != "application/vnd.apple.mpegurl"
     }

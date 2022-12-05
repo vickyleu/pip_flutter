@@ -26,7 +26,7 @@ fileprivate extension URL {
     
     /// Is called when the data being downloaded did not arrive in time to
     /// continue playback.
-    @objc optional func playerItemPlaybackStalled(_ playerItem: PipCachingPlayerItem)
+    @objc  optional func playerItemPlaybackStalled(_ playerItem: PipCachingPlayerItem)
     
     /// Is called on downloading error.
     @objc optional func playerItem(_ playerItem: PipCachingPlayerItem, downloadingFailedWith error: Error)

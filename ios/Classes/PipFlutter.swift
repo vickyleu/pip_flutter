@@ -338,7 +338,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         self.startStalledCheck()
     }
 
-    func startStalledCheck() {
+   @objc func startStalledCheck() {
         guard let currentItem = self.player.currentItem else {return}
       
         if currentItem.isPlaybackLikelyToKeepUp ||
@@ -556,7 +556,13 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     }
 
     func absolutePosition() -> Int64 {
-        return PipFlutterTimeUtils.timeToMillis(CMTime(value: CMTimeValue(self.player.currentItem!.currentDate()!.timeIntervalSince1970), timescale: 1) )
+        
+        if self.player.currentItem!.currentDate() != nil {
+            return PipFlutterTimeUtils.timeToMillis(CMTime(value: CMTimeValue(self.player.currentItem!.currentDate()!.timeIntervalSince1970), timescale: 1) )
+        }else{
+            return 0
+        }
+    
     }
 
     func duration() -> Int64 {

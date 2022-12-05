@@ -67,10 +67,9 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
             return
         }
         do {
-            ///TODO 
-            
             let controller = UIApplication.shared.keyWindow?.rootViewController as! FlutterViewController
-            self.aspect = try controller.aspect_hook(Selector("viewDidLayoutSubviews"), usingBlock: {
+            
+            self.aspect = try controller.aspect_hook(selector: #selector(FlutterViewController.viewDidLayoutSubviews), options: .positionInstead, usingBlock: { info in
                 if !self.isInPipMode {
                     let controller = UIApplication.shared.keyWindow?.rootViewController as! FlutterViewController
                     if self.players.count != 1 {
@@ -79,21 +78,17 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                     if !controller.isEqual(FlutterViewController.self) {
                         return
                     }
-                    //                if !controller.dynamicType.isEqual(FlutterViewController.self) {return}
                     let players = self.players.map {
                         $0.1
                     }
                     let player = players.last
                     if player != nil && player!.isPlaying && !player!.isPiping {
+                        print("preparePipFrame")
                         self.channel.invokeMethod("preparePipFrame", arguments: nil)
                         self.isInPipMode = true
                     }
                 }
             })
-//            self.aspect = try FlutterViewController.aspect_hook(#selector(FlutterViewController.viewDidLayoutSubviews),with: AspectOptions(rawValue: 2),usingBlock: {(aspectInfo: AspectInfo!)in
-//                
-//            })
-            
            
         } catch let error {
             print("\(error.localizedDescription)")
@@ -134,6 +129,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         }
         let player = players.last
         if player != nil && player!.isPlaying && !player!.isPiping {
+            print("preparePip to")
             self.channel.invokeMethod("prepareToPip", arguments: nil)
             self.backgroundHandler(player!, application)
         }
@@ -646,18 +642,33 @@ extension Dictionary where Value: Equatable {
                 }
     }
 }
-extension AnyObject? {
+
+extension Optional where Wrapped: AnyObject {
     func isNsnullOrNil() -> Bool
-    {
-        if (self is NSNull) || (self == nil)
-        {
-            return true
-        }
-        else
-        {
-            return false
-        }
-    }
+       {
+           if (self is NSNull) || (self == nil)
+           {
+               return true
+           }
+           else
+           {
+               return false
+           }
+       }
+}
+
+extension Optional where Wrapped: NSObject {
+    func isNsnullOrNil() -> Bool
+       {
+           if (self is NSNull) || (self == nil)
+           {
+               return true
+           }
+           else
+           {
+               return false
+           }
+       }
 }
 
 
