@@ -104,7 +104,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     }
 
     public func view() -> UIView {
-        let playerView:PipFlutterView! = PipFlutterView(frame:CGRectZero)
+        let playerView = PipFlutterView(frame:CGRectZero)
         playerView.player = self.player
         return playerView
     }
@@ -276,7 +276,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             let asset:AVURLAsset! = AVURLAsset(url: url,
                                                     options:["AVURLAssetHTTPHeaderFieldsKey" : headers])
             if certificateUrl != nil && certificateUrl!.lengthOfBytes(using: .utf8) > 0 {
-                self.loaderDelegate =  PipFlutterEzDrmAssetsLoaderDelegate.init(URL.init(string: certificateUrl!)!, withLicense: URL.init(string: licenseUrl!)!)
+                self.loaderDelegate =   PipFlutterEzDrmAssetsLoaderDelegate.init(URL.init(string: certificateUrl!)!, URL.init(string: licenseUrl!)!)
                
     //            dispatch_queue_attr_t qos = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INTERACTIVE, -1);
                 let streamQueue = DispatchQueue.init(label: "streamQueue")
@@ -422,10 +422,10 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
                     var values = [Int64]()
                     (object as! AVPlayerItem).loadedTimeRanges.forEach { rangeValue in
                         let range = rangeValue.timeRangeValue
-                        let start = PipFlutterTimeUtils.fltcmTime(toMillis: range.start)
-                        var end = start + PipFlutterTimeUtils.fltcmTime(toMillis: range.duration)
+                        let start = PipFlutterTimeUtils.timeToMillis(range.start)
+                        var end = start + PipFlutterTimeUtils.timeToMillis(range.duration)
                         if CMTIME_IS_VALID(self.player.currentItem!.forwardPlaybackEndTime){
-                            let endTime = PipFlutterTimeUtils.fltcmTime(toMillis: self.player.currentItem!.forwardPlaybackEndTime)
+                            let endTime = PipFlutterTimeUtils.timeToMillis(self.player.currentItem!.forwardPlaybackEndTime)
                             if end > endTime {
                                 end = endTime
                             }
@@ -522,7 +522,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             let prefTrans = track.assetTrack!.preferredTransform
             let realSize:CGSize = CGSizeApplyAffineTransform(naturalSize, prefTrans)
 
-            let duration = PipFlutterTimeUtils.fltcmTime(toMillis: self.player.currentItem!.asset.duration)
+            let duration = PipFlutterTimeUtils.timeToMillis( self.player.currentItem!.asset.duration)
             if self.overriddenDuration > 0 && duration > self.overriddenDuration {
                 self.player.currentItem!.forwardPlaybackEndTime = CMTimeMake(value: Int64(self.overriddenDuration/1000), timescale: 1)
             }
@@ -552,11 +552,11 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     }
 
     func position() -> Int64 {
-        return PipFlutterTimeUtils.fltcmTime(toMillis: self.player.currentTime() )
+        return PipFlutterTimeUtils.timeToMillis(self.player.currentTime() )
     }
 
     func absolutePosition() -> Int64 {
-        return PipFlutterTimeUtils.fltcmTime(toMillis: CMTime(value: CMTimeValue(self.player.currentItem!.currentDate()!.timeIntervalSince1970), timescale: 1) )
+        return PipFlutterTimeUtils.timeToMillis(CMTime(value: CMTimeValue(self.player.currentItem!.currentDate()!.timeIntervalSince1970), timescale: 1) )
     }
 
     func duration() -> Int64 {
@@ -570,7 +570,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             time = self.player.currentItem!.forwardPlaybackEndTime
         }
 
-        return PipFlutterTimeUtils.fltcmTime(toMillis: time)
+        return PipFlutterTimeUtils.timeToMillis(time)
     }
 
     func seekTo(location:Int) {

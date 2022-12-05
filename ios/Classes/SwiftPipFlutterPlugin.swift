@@ -281,7 +281,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                     let playbackEvent = event as! MPChangePlaybackPositionCommandEvent
 
                     let time: CMTime = CMTimeMake(value: Int64(playbackEvent.positionTime), timescale: 1)
-                    let millis = PipFlutterTimeUtils.fltcmTime(toMillis: (time))
+                    let millis = PipFlutterTimeUtils.timeToMillis(time)
                     self._notificationPlayer!.seekTo(location:  Int((millis)))
                     self._notificationPlayer!.eventSink?(["event": "seek", "position": millis])
                 }

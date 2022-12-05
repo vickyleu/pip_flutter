@@ -9,7 +9,7 @@ import Foundation
 import AVKit
 import AVFoundation
 
-class PipFlutterEzDrmAssetsLoaderDelegate2 : NSObject {
+class PipFlutterEzDrmAssetsLoaderDelegate : NSObject {
 
    
     private(set)var certificateURL:URL
@@ -20,10 +20,10 @@ class PipFlutterEzDrmAssetsLoaderDelegate2 : NSObject {
     private let DEFAULT_LICENSE_SERVER_URL:String! = "https://fps.ezdrm.com/api/licenses/"
 
     init(_ certificateURL:URL, _ licenseURL:URL?) {
-       super.init()
         self.certificateURL = certificateURL
         self.licenseURL = licenseURL
-       
+       super.init()
+        
     }
 
     /*------------------------------------------
@@ -33,8 +33,8 @@ class PipFlutterEzDrmAssetsLoaderDelegate2 : NSObject {
      ** Takes the bundled SPC and sends it to the license server defined at licenseUrl or KEY_SERVER_URL (if licenseUrl is null).
      ** It returns CKC.
      ** ---------------------------------------*/
-    func getContentKeyAndLeaseExpiryFromKeyServerModuleWithRequest(requestBytes:Data,  assetId:String,  customParams:String,  errorOut:Error) -> Data {
-        var decodedData:Data
+    func getContentKeyAndLeaseExpiryFromKeyServerModuleWithRequest(requestBytes:Data,  assetId:String,  customParams:String,  errorOut:Error) -> Data? {
+        var decodedData:Data?
        
         var finalLicenseURL:URL
         if self.licenseURL != nil {
@@ -76,10 +76,10 @@ class PipFlutterEzDrmAssetsLoaderDelegate2 : NSObject {
     func resourceLoader(resourceLoader:AVAssetResourceLoader!, shouldWaitForLoadingOfRequestedResource loadingRequest:AVAssetResourceLoadingRequest!) -> Bool {
         let assetURI = loadingRequest.request.url!
         let str = assetURI.absoluteString
+        let index = str.index(str.endIndex, offsetBy: -36)
+        let mySubstring = str[index...].utf8
         
-        let mySubstring = str[(str.lengthOfBytes(using: .utf8) - 36)...]
-
-        self.assetId = mySubstring
+        self.assetId = String(mySubstring)
         let scheme = assetURI.scheme
         var requestBytes:Data!
         var certificate:Data!
@@ -88,12 +88,12 @@ class PipFlutterEzDrmAssetsLoaderDelegate2 : NSObject {
         }
         do {
             certificate = try self.getAppCertificate(self.assetId)
-        }catch let error {
+        }catch  {
             loadingRequest.finishLoading(with: NSError(domain: URLError.errorDomain, code: URLError.clientCertificateRejected.rawValue,userInfo: nil))
         }
         do {
             try loadingRequest.streamingContentKeyRequestData(forApp: certificate, contentIdentifier: str.data(using: .utf8)!,options: nil)
-        }catch let error {
+        }catch {
             loadingRequest.finishLoading(with: nil)
             return true
         }
@@ -104,18 +104,20 @@ class PipFlutterEzDrmAssetsLoaderDelegate2 : NSObject {
 
         responseData = self.getContentKeyAndLeaseExpiryFromKeyServerModuleWithRequest(requestBytes: requestBytes, assetId: self.assetId, customParams: passthruParams, errorOut: error)
        
-        if responseData != nil && responseData != nil && !responseData.dynamicType.isKindOfClass(NSNull.self) {
+        if responseData != nil {
             let dataRequest:AVAssetResourceLoadingDataRequest! = loadingRequest.dataRequest
-            dataRequest.respondWithData(responseData)
+            dataRequest.respond(with: responseData)
             loadingRequest.finishLoading()
         } else {
-            loadingRequest.finishLoadingWithError(error)
+            loadingRequest.finishLoading(with: error)
         }
 
         return true
     }
 
+    
     func resourceLoader(resourceLoader:AVAssetResourceLoader!, shouldWaitForRenewalOfRequestedResource renewalRequest:AVAssetResourceRenewalRequest!) -> Bool {
-        return self.resourceLoader(resourceLoader, shouldWaitForLoadingOfRequestedResource:renewalRequest)
+        return self.resourceLoader(resourceLoader: resourceLoader, shouldWaitForLoadingOfRequestedResource: renewalRequest)
+ 
     }
 }
