@@ -14,11 +14,13 @@ class PipFlutterView : UIView {
         get{self.playerLayer.player}
         set{self.playerLayer.player = newValue}
     }
-    var playerLayer:AVPlayerLayer{
+    var playerLayer:AVPlayerLayer
+    {
         get{(self.layer as! AVPlayerLayer)}
     }
+
     // Override UIView method
-    class func layerClass() -> AnyClass {
+    override class var layerClass: AnyClass{
         return AVPlayerLayer.self
     }
 

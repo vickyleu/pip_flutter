@@ -1,6 +1,5 @@
 import Foundation
 import MediaPlayer
-import Aspects
 import AVKit
 import AVFoundation
 import GLKit
@@ -68,8 +67,10 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
             return
         }
         do {
-            self.aspect = try FlutterViewController.aspect_hook(#selector(UIViewController.viewDidLayoutSubviews),
-                    with: AspectOptions.positionInstead, usingBlock: { (aspectInfo: AspectInfo!) in
+            ///TODO 
+            
+            let controller = UIApplication.shared.keyWindow?.rootViewController as! FlutterViewController
+            self.aspect = try controller.aspect_hook(Selector("viewDidLayoutSubviews"), usingBlock: {
                 if !self.isInPipMode {
                     let controller = UIApplication.shared.keyWindow?.rootViewController as! FlutterViewController
                     if self.players.count != 1 {
@@ -89,7 +90,13 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                     }
                 }
             })
-        } catch  {
+//            self.aspect = try FlutterViewController.aspect_hook(#selector(FlutterViewController.viewDidLayoutSubviews),with: AspectOptions(rawValue: 2),usingBlock: {(aspectInfo: AspectInfo!)in
+//                
+//            })
+            
+           
+        } catch let error {
+            print("\(error.localizedDescription)")
         }
     }
 
@@ -394,6 +401,8 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         _timeObserverIdDict.removeAll()
 
     }
+    
+    
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
@@ -428,7 +437,8 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 let maxCacheSize = dataSource["maxCacheSize"] as? Int
                 let videoExtension = dataSource["videoExtension"] as? String
                 var overriddenDuration:Int = 0
-                if dataSource["overriddenDuration"] != nil {
+                if !dataSource["overriddenDuration"].isNsnullOrNil() {
+                    print("\(dataSource["overriddenDuration"])")
                     overriddenDuration = dataSource["overriddenDuration"] as! Int
                 }
 
@@ -636,3 +646,19 @@ extension Dictionary where Value: Equatable {
                 }
     }
 }
+extension AnyObject? {
+    func isNsnullOrNil() -> Bool
+    {
+        if (self is NSNull) || (self == nil)
+        {
+            return true
+        }
+        else
+        {
+            return false
+        }
+    }
+}
+
+
+

@@ -18,7 +18,7 @@ A new flutter plugin project.
   s.dependency 'Flutter'
   s.dependency 'Cache', '~> 6.0.0'
   s.dependency 'GCDWebServer', '~> 3.0'
-  s.dependency 'Aspects', '~> 1.4.1'
+#   s.dependency 'Aspects', '~> 1.4.2'
   s.dependency 'HLSCachingReverseProxyServer', '~> 0.1.0'
 
   s.pod_target_xcconfig = { 'SWIFT_VERSION' => '4' }
