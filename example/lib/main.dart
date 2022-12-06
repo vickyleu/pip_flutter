@@ -144,66 +144,68 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
               color: Colors.white,
             )),
       ),
-      body: Column(
-        children: [
-          const SizedBox(height: 20),
-          Flexible(
-            flex: 1,
-            fit: FlexFit.loose,
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: PipFlutterPlayer(
-                controller: pipFlutterPlayerController,
-                key: pipFlutterPlayerKey,
+      body: ClipRect(
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+            Flexible(
+              flex: 1,
+              fit: FlexFit.loose,
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: PipFlutterPlayer(
+                  controller: pipFlutterPlayerController,
+                  key: pipFlutterPlayerKey,
+                ),
               ),
             ),
-          ),
-          Container(
-            margin: const EdgeInsets.only(top: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                InkWell(
-                  child: Container(
-                      width: MediaQuery.of(context).size.width * 0.4,
-                      padding: const EdgeInsets.all(8.0),
-                      margin: const EdgeInsets.all(8.0),
-                      decoration: BoxDecoration(
-                          color: Colors.pink,
-                          borderRadius: BorderRadius.circular(12.0)),
-                      child: const Center(
-                          child: Text(
-                        "Show PiP",
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold),
-                      ))),
-                  onTap: () {
-                    pipFlutterPlayerController
-                        .enablePictureInPicture(pipFlutterPlayerKey);
-                  },
-                ),
-                InkWell(
-                  child: Container(
-                      width: MediaQuery.of(context).size.width * 0.4,
-                      padding: const EdgeInsets.all(8.0),
-                      margin: const EdgeInsets.all(8.0),
-                      decoration: BoxDecoration(
-                          color: Colors.pink,
-                          borderRadius: BorderRadius.circular(12.0)),
-                      child: const Center(
-                          child: Text(
-                        "Disable PiP",
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold),
-                      ))),
-                  onTap: () async {
-                    pipFlutterPlayerController.disablePictureInPicture();
-                  },
-                ),
-              ],
+            Container(
+              margin: const EdgeInsets.only(top: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  InkWell(
+                    child: Container(
+                        width: MediaQuery.of(context).size.width * 0.4,
+                        padding: const EdgeInsets.all(8.0),
+                        margin: const EdgeInsets.all(8.0),
+                        decoration: BoxDecoration(
+                            color: Colors.pink,
+                            borderRadius: BorderRadius.circular(12.0)),
+                        child: const Center(
+                            child: Text(
+                              "Show PiP",
+                              style: TextStyle(
+                                  color: Colors.white, fontWeight: FontWeight.bold),
+                            ))),
+                    onTap: () {
+                      pipFlutterPlayerController
+                          .enablePictureInPicture(pipFlutterPlayerKey);
+                    },
+                  ),
+                  InkWell(
+                    child: Container(
+                        width: MediaQuery.of(context).size.width * 0.4,
+                        padding: const EdgeInsets.all(8.0),
+                        margin: const EdgeInsets.all(8.0),
+                        decoration: BoxDecoration(
+                            color: Colors.pink,
+                            borderRadius: BorderRadius.circular(12.0)),
+                        child: const Center(
+                            child: Text(
+                              "Disable PiP",
+                              style: TextStyle(
+                                  color: Colors.white, fontWeight: FontWeight.bold),
+                            ))),
+                    onTap: () async {
+                      pipFlutterPlayerController.disablePictureInPicture();
+                    },
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

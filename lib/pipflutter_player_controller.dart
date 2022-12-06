@@ -1160,23 +1160,24 @@ class PipFlutterPlayerController {
         (await videoPlayerController!.isPictureInPictureSupported()) ?? false;
 
     if (isPipSupported) {
-      if (Platform.isIOS) {
-        final RenderBox? renderBox = pipFlutterPlayerGlobalKey.currentContext!
-            .findRenderObject() as RenderBox?;
-        if (renderBox == null) {
-          PipFlutterPlayerUtils.log(
-              "Can't show PiP. RenderBox is null. Did you provide valid global"
-              " key?");
-          return;
-        }
-        final Offset position = renderBox.localToGlobal(Offset.zero);
+      final RenderBox? renderBox = pipFlutterPlayerGlobalKey.currentContext!
+          .findRenderObject() as RenderBox?;
+      if (renderBox == null) {
+        PipFlutterPlayerUtils.log(
+            "Can't show PiP. RenderBox is null. Did you provide valid global"
+                " key?");
+        return;
+      }
+      final Offset position = renderBox.localToGlobal(Offset.zero);
+
+      if (Platform.isAndroid || Platform.isIOS) {
         return videoPlayerController?.enablePictureInPictureFrame(
           left: position.dx,
           top: position.dy,
           width: renderBox.size.width,
           height: renderBox.size.height,
         );
-      } else {
+      }else {
         PipFlutterPlayerUtils.log("Unsupported PiP in current platform.");
       }
     } else {

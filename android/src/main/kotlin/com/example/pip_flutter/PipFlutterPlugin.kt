@@ -5,6 +5,7 @@ import android.app.Application
 import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -162,7 +163,17 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
     }
 
 
+    override fun onActivityPostResumed(activity: Activity) {
+        super.onActivityPostResumed(activity)
+    }
+
     override fun onActivityPaused(activity: Activity) {
+
+    }
+
+
+    override fun onActivityPostPaused(activity: Activity) {
+        super.onActivityPostPaused(activity)
         if (videoPlayers.size() != 1) return
         if (activity != this.activity || !isPictureInPictureSupported()) return
         val player = videoPlayers.valueAt(0)
@@ -171,6 +182,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
             flutterState!!.invokeMethod("prepareToPip")
         }
     }
+
 
     /**
      * Activity mCanEnterPictureInPicture  wasn't update by performResume,should change it by private api
@@ -480,9 +492,11 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
             val act = activity?:return
             player.setupMediaSession(flutterState!!.applicationContext, true)
             setCanEnterPictureInPicture(act)
+            setCanEnterPictureInPicture(act)
             val result = act.enterPictureInPictureMode(PictureInPictureParams.Builder().build())
             startPictureInPictureListenerTimer(player)
             player.onPictureInPictureStatusChanged(true)
+
         }
     }
 
@@ -514,7 +528,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
 
     private fun countingPlayer(player: PipFlutterPlayer) {
         if(player.isPlaying()){
-            flutterState!!.invokeMethod("prepareToPip", mapOf(
+            flutterState!!.invokeMethod("pipNotify", mapOf(
                 "position" to player.position,
                 "duration" to player.duration,
             ))
@@ -584,6 +598,8 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
         private const val VOLUME_PARAMETER = "volume"
         private const val LOCATION_PARAMETER = "location"
         private const val SPEED_PARAMETER = "speed"
+        private const val LEFT_PARAMETER = "left"
+        private const val TOP_PARAMETER = "top"
         private const val WIDTH_PARAMETER = "width"
         private const val HEIGHT_PARAMETER = "height"
         private const val BITRATE_PARAMETER = "bitrate"
