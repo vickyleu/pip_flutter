@@ -466,7 +466,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
         creationParams: {'textureId': textureId!},
       );
     } else {
-      /*return PlatformViewLink(
+      return PlatformViewLink(
         viewType: viewType,
         surfaceFactory:
             (context, controller) {
@@ -490,7 +490,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
             ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
             ..create();
         },
-      );*/
+      );
       return Texture(textureId: textureId!);
     }
   }

@@ -70,3 +70,7 @@ android {
         implementation 'org.lsposed.hiddenapibypass:hiddenapibypass:4.3'
     }
 }
+
+dependencies {
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+}

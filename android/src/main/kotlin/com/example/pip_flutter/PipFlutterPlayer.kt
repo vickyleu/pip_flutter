@@ -19,7 +19,8 @@ import android.support.v4.media.session.PlaybackStateCompat
 import android.util.AttributeSet
 import android.util.Log
 import android.util.Xml
-import android.view.Surface
+import android.view.*
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.lifecycle.Observer
 import androidx.media.session.MediaButtonReceiver
 import androidx.work.Data
@@ -57,6 +58,7 @@ import com.google.android.exoplayer2.util.Util
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.EventChannel.EventSink
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.platform.PlatformView
 import io.flutter.view.TextureRegistry.SurfaceTextureEntry
 import org.xmlpull.v1.XmlPullParser
 import java.io.File
@@ -65,19 +67,30 @@ import kotlin.math.max
 import kotlin.math.min
 
 
+internal class FakePlatformView(private val context: Context?) : PlatformView{
+    override fun getView(): View? {
+        return  if(context!=null){View(context)}else{null}
+    }
+    override fun dispose() {
+
+    }
+}
+
 internal class PipFlutterPlayer(
     context: Context,
     private val eventChannel: EventChannel,
-    private val textureEntry: SurfaceTextureEntry,
-    customDefaultLoadControl: CustomDefaultLoadControl?,
-    result: MethodChannel.Result
-) {
-    private val exoPlayer: ExoPlayer?
+    private val textureId: Long,
+    private var customDefaultLoadControl: CustomDefaultLoadControl? = CustomDefaultLoadControl(),
+    private val result: MethodChannel.Result,
+): PlatformView{
+    private val constraintLayout: ConstraintLayout
+    private val surfaceView: SurfaceView
+    private val exoPlayer: ExoPlayer
     private val eventSink = QueuingEventSink()
     private val trackSelector: DefaultTrackSelector = DefaultTrackSelector(context)
     private val loadControl: LoadControl
     private var isInitialized = false
-    private var surface: Surface? = null
+//    private var surface: Surface? = null
     private var key: String? = null
     private var playerNotificationManager: PlayerNotificationManager? = null
     private var refreshHandler: Handler? = null
@@ -88,19 +101,25 @@ internal class PipFlutterPlayer(
     private var drmSessionManager: DrmSessionManager? = null
     private val workManager: WorkManager
     private val workerObserverMap: HashMap<UUID, Observer<WorkInfo?>>
-    private val customDefaultLoadControl: CustomDefaultLoadControl =
-        customDefaultLoadControl ?: CustomDefaultLoadControl()
+
     private var lastSendBufferedPosition = 0L
 
     init {
+        if(this.customDefaultLoadControl==null){
+            this.customDefaultLoadControl = CustomDefaultLoadControl()
+        }
+        val cdl = this.customDefaultLoadControl!!
         val loadBuilder = DefaultLoadControl.Builder()
         loadBuilder.setBufferDurationsMs(
-            this.customDefaultLoadControl.minBufferMs,
-            this.customDefaultLoadControl.maxBufferMs,
-            this.customDefaultLoadControl.bufferForPlaybackMs,
-            this.customDefaultLoadControl.bufferForPlaybackAfterRebufferMs
+            cdl.minBufferMs,
+            cdl.maxBufferMs,
+            cdl.bufferForPlaybackMs,
+            cdl.bufferForPlaybackAfterRebufferMs
         )
         loadControl = loadBuilder.build()
+        this.constraintLayout = LayoutInflater.from(context)
+            .inflate(R.layout.exoplayer_layout, null,false) as ConstraintLayout
+        this.surfaceView = constraintLayout.findViewById(R.id.exo_player_surface_view)
 
 //        val parser: XmlPullParser = context.resources.getXml(R.xml.attrs)
 //        try {
@@ -119,7 +138,8 @@ internal class PipFlutterPlayer(
             .build()
         workManager = WorkManager.getInstance(context)
         workerObserverMap = HashMap()
-        setupVideoPlayer(eventChannel, textureEntry, result)
+//        setupVideoPlayer(eventChannel,result)
+
     }
 
     fun setDataSource(
@@ -359,7 +379,7 @@ internal class PipFlutterPlayer(
                 )
             }
         }
-        exoPlayer!!.addListener(exoPlayerEventListener!!)
+        exoPlayer.addListener(exoPlayerEventListener!!)
         exoPlayer.seekTo(0)
     }
 
@@ -419,81 +439,6 @@ internal class PipFlutterPlayer(
         return forwardingPlayer
     }
 
-
-    /*private fun setupControlDispatcher(): ControlDispatcher {
-        return object : ControlDispatcher {
-            override fun dispatchPrepare(player: Player): Boolean {
-                return false
-            }
-
-            override fun dispatchSetPlayWhenReady(player: Player, playWhenReady: Boolean): Boolean {
-                if (player.playWhenReady) {
-                    sendEvent("pause")
-                } else {
-                    sendEvent("play")
-                }
-                return true
-            }
-
-            override fun dispatchSeekTo(
-                player: Player,
-                windowIndex: Int,
-                positionMs: Long
-            ): Boolean {
-                sendSeekToEvent(positionMs)
-                return true
-            }
-
-            override fun dispatchPrevious(player: Player): Boolean {
-                return false
-            }
-
-            override fun dispatchNext(player: Player): Boolean {
-                return false
-            }
-
-            override fun dispatchRewind(player: Player): Boolean {
-                sendSeekToEvent(player.currentPosition - 5000)
-                return false
-            }
-
-            override fun dispatchFastForward(player: Player): Boolean {
-                sendSeekToEvent(player.currentPosition + 5000)
-                return true
-            }
-
-            override fun dispatchSetRepeatMode(player: Player, repeatMode: Int): Boolean {
-                return false
-            }
-
-            override fun dispatchSetShuffleModeEnabled(
-                player: Player,
-                shuffleModeEnabled: Boolean
-            ): Boolean {
-                return false
-            }
-
-            override fun dispatchStop(player: Player, reset: Boolean): Boolean {
-                return false
-            }
-
-            override fun dispatchSetPlaybackParameters(
-                player: Player,
-                playbackParameters: PlaybackParameters
-            ): Boolean {
-                return false
-            }
-
-            override fun isRewindEnabled(): Boolean {
-                return true
-            }
-
-            override fun isFastForwardEnabled(): Boolean {
-                return true
-            }
-        }
-    }
-*/
     fun disposeRemoteNotifications() {
         if (exoPlayerEventListener != null) {
             exoPlayer!!.removeListener(exoPlayerEventListener!!)
@@ -596,8 +541,42 @@ internal class PipFlutterPlayer(
 
     }
 
+    private val playerListener = object : Player.Listener {
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            when (playbackState) {
+                Player.STATE_BUFFERING -> {
+                    sendBufferingUpdate(true)
+                    val event: MutableMap<String, Any> = HashMap()
+                    event["event"] = "bufferingStart"
+                    eventSink.success(event)
+                }
+                Player.STATE_READY -> {
+                    if (!isInitialized) {
+                        isInitialized = true
+                        sendInitialized()
+                    }
+                    val event: MutableMap<String, Any> = HashMap()
+                    event["event"] = "bufferingEnd"
+                    eventSink.success(event)
+                }
+                Player.STATE_ENDED -> {
+                    val event: MutableMap<String, Any?> = HashMap()
+                    event["event"] = "completed"
+                    event["key"] = key
+                    eventSink.success(event)
+                }
+                Player.STATE_IDLE -> {
+                    //no-op
+                }
+            }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            eventSink.error("VideoError", "Video player had error $error", "")
+        }
+    }
     private fun setupVideoPlayer(
-        eventChannel: EventChannel, textureEntry: SurfaceTextureEntry, result: MethodChannel.Result
+        eventChannel: EventChannel,  result: MethodChannel.Result //textureEntry: SurfaceTextureEntry,holder: SurfaceHolder,
     ) {
         eventChannel.setStreamHandler(
             object : EventChannel.StreamHandler {
@@ -609,45 +588,13 @@ internal class PipFlutterPlayer(
                     eventSink.setDelegate(null)
                 }
             })
-        surface = Surface(textureEntry.surfaceTexture())
-        exoPlayer!!.setVideoSurface(surface)
+//        surface = Surface(textureEntry.surfaceTexture())
+        exoPlayer.setVideoSurfaceView(surfaceView)
         setAudioAttributes(exoPlayer, true)
-        exoPlayer.addListener(object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                when (playbackState) {
-                    Player.STATE_BUFFERING -> {
-                        sendBufferingUpdate(true)
-                        val event: MutableMap<String, Any> = HashMap()
-                        event["event"] = "bufferingStart"
-                        eventSink.success(event)
-                    }
-                    Player.STATE_READY -> {
-                        if (!isInitialized) {
-                            isInitialized = true
-                            sendInitialized()
-                        }
-                        val event: MutableMap<String, Any> = HashMap()
-                        event["event"] = "bufferingEnd"
-                        eventSink.success(event)
-                    }
-                    Player.STATE_ENDED -> {
-                        val event: MutableMap<String, Any?> = HashMap()
-                        event["event"] = "completed"
-                        event["key"] = key
-                        eventSink.success(event)
-                    }
-                    Player.STATE_IDLE -> {
-                        //no-op
-                    }
-                }
-            }
-
-            override fun onPlayerError(error: PlaybackException) {
-                eventSink.error("VideoError", "Video player had error $error", "")
-            }
-        })
+        exoPlayer.removeListener(playerListener)
+        exoPlayer.addListener(playerListener)
         val reply: MutableMap<String, Any> = HashMap()
-        reply["textureId"] = textureEntry.id()
+        reply["textureId"] = textureId
         result.success(reply)
     }
 
@@ -714,7 +661,7 @@ internal class PipFlutterPlayer(
             parametersBuilder.setMaxVideoSize(width, height)
         }
         if (bitrate != 0) {
-            parametersBuilder.setMaxVideoBitrate(bitrate)
+            parametersBuilder.setMaxVideoBitrate(bitrate.toInt())
         }
         if (width == 0 && height == 0 && bitrate == 0) {
             parametersBuilder.clearVideoSizeConstraints()
@@ -802,6 +749,7 @@ internal class PipFlutterPlayer(
             }
         })
         mediaSession.isActive = true
+
         val mediaSessionConnector = MediaSessionConnector(mediaSession)
         /*if (setupControlDispatcher) {
             mediaSessionConnector.setControlDispatcher(setupControlDispatcher())
@@ -927,30 +875,55 @@ internal class PipFlutterPlayer(
         setAudioAttributes(exoPlayer, mixWithOthers)
     }
 
-    fun dispose() {
+    override fun dispose() {
+        Log.wtf("${this.javaClass}","dispose")
+//        surfaceView.releasePointerCapture()
+        exoPlayer.setVideoSurfaceView(surfaceView)
+    }
+     fun disposePlayer() {
+         Log.wtf("${this.javaClass}","disposePlayer")
         disposeMediaSession()
         disposeRemoteNotifications()
         if (isInitialized) {
             exoPlayer?.stop()
         }
-        textureEntry.release()
-        eventChannel.setStreamHandler(null)
+/*        textureEntry.release()
+
         surface?.release()
-        exoPlayer?.release()
+        exoPlayer?.release()*/
+
+        eventChannel.setStreamHandler(null)
+//        exoPlayer.stop()
+        exoPlayer.clearMediaItems()
+        if(exoPlayerEventListener!=null){
+            exoPlayer.removeListener(exoPlayerEventListener!!)
+        }
+        exoPlayerEventListener=null
+        exoPlayer.release()
     }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other == null || javaClass != other.javaClass) return false
         val that = other as PipFlutterPlayer
-        if (if (exoPlayer != null) exoPlayer != that.exoPlayer else that.exoPlayer != null) return false
-        return if (surface != null) surface == that.surface else that.surface == null
+        if (exoPlayer != that.exoPlayer) return false
+        return if (surfaceView.holder.surface != null) surfaceView.holder.surface == that.surfaceView.holder.surface else that.surfaceView.holder.surface == null
     }
 
     override fun hashCode(): Int {
-        var result = exoPlayer?.hashCode() ?: 0
-        result = 31 * result + if (surface != null) surface.hashCode() else 0
+        var result = exoPlayer.hashCode()
+        result = 31 * result + if (surfaceView.holder.surface != null) surfaceView.holder.surface.hashCode() else 0
         return result
+    }
+
+
+    override fun getView(): View {
+       val parent =  constraintLayout.parent as? ViewGroup
+        if(parent!=null){
+            parent.removeView(constraintLayout)
+        }
+        setupVideoPlayer(eventChannel,result)
+       return constraintLayout
     }
 
     companion object {

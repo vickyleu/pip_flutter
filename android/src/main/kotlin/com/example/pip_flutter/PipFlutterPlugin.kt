@@ -12,6 +12,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.util.LongSparseArray
+import android.util.Rational
 import com.example.pip_flutter.PipFlutterPlayerCache.releaseCache
 import com.google.android.exoplayer2.util.Log.LOG_LEVEL_OFF
 import io.flutter.embedding.engine.loader.FlutterLoader
@@ -19,12 +20,10 @@ import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.FlutterPlugin.FlutterPluginBinding
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
-import io.flutter.plugin.common.BinaryMessenger
-import io.flutter.plugin.common.EventChannel
-import io.flutter.plugin.common.MethodCall
-import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.*
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
-import io.flutter.view.TextureRegistry
+import io.flutter.plugin.platform.PlatformView
+import io.flutter.plugin.platform.PlatformViewFactory
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import java.lang.reflect.Field
 
@@ -32,7 +31,7 @@ import java.lang.reflect.Field
  * Android platform implementation of the VideoPlayerPlugin.
  */
 class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
-    Application.ActivityLifecycleCallbacks {
+    Application.ActivityLifecycleCallbacks, PlatformViewFactory(StandardMessageCodec()) {
     private val videoPlayers = LongSparseArray<PipFlutterPlayer>()
     private val dataSources = LongSparseArray<Map<String, Any?>>()
     private var flutterState: FlutterState? = null
@@ -43,29 +42,39 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
     private var pipRunnable: Runnable? = null
 
 
+    private var texturesCount = 0.toLong()
+
+    private fun newTextureId() :Long {
+        texturesCount += 1
+        return texturesCount
+    }
+
+
     override fun onAttachedToEngine(binding: FlutterPluginBinding) {
         Log.e("CALLMETHOD", "onAttachedToEngine: ")
         com.google.android.exoplayer2.util.Log.setLogLevel(LOG_LEVEL_OFF)
         val loader = FlutterLoader()
         flutterState = FlutterState(
             binding.applicationContext,
-            binding.binaryMessenger, object : KeyForAssetFn {
+            binding.binaryMessenger,
+            object : KeyForAssetFn {
                 override fun get(asset: String?): String {
                     return loader.getLookupKeyForAsset(
-                        asset!!
+                        asset ?: ""
                     )
                 }
 
-            }, object : KeyForAssetAndPackageName {
+            },
+            object : KeyForAssetAndPackageName {
                 override fun get(asset: String?, packageName: String?): String {
                     return loader.getLookupKeyForAsset(
-                        asset!!, packageName!!
+                        asset ?: "", packageName ?: ""
                     )
                 }
             },
-            binding.textureRegistry
         )
-        flutterState!!.startListening(this)
+        flutterState?.startListening(this)
+        binding.platformViewRegistry.registerViewFactory("com.pipflutter/pipflutter_player",this)
     }
 
 
@@ -75,7 +84,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
         }
         disposeAllPlayers()
         releaseCache()
-        flutterState!!.stopListening()
+        flutterState?.stopListening()
         flutterState = null
     }
 
@@ -101,7 +110,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
 
     private fun disposeAllPlayers() {
         for (i in 0 until videoPlayers.size()) {
-            videoPlayers.valueAt(i).dispose()
+            videoPlayers.valueAt(i).disposePlayer()
         }
         videoPlayers.clear()
         dataSources.clear()
@@ -110,7 +119,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
 //        Log.e("CALLMETHOD", "onMethodCall: call.method --> " + call.method)
 //        Log.e("CALLMETHOD", "onMethodCall: result --> $result")
-        if (flutterState == null || flutterState!!.textureRegistry == null) {
+        if (flutterState == null ) {
             result.error(
                 "no_activity",
                 "pipflutter_player plugin requires a foreground activity",
@@ -121,10 +130,15 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
         when (call.method) {
             INIT_METHOD -> disposeAllPlayers()
             CREATE_METHOD -> {
-                val handle = flutterState!!.textureRegistry!!.createSurfaceTexture()
-                val eventChannel = EventChannel(
-                    flutterState!!.binaryMessenger, EVENTS_CHANNEL + handle.id()
-                )
+                val flutterState = flutterState
+                if (flutterState == null) {
+                    result.error(
+                        "flutterState null",
+                        "flutterState null",
+                        null
+                    )
+                    return
+                }
                 var customDefaultLoadControl: CustomDefaultLoadControl? = null
                 if (call.hasArgument(MIN_BUFFER_MS) && call.hasArgument(MAX_BUFFER_MS) &&
                     call.hasArgument(BUFFER_FOR_PLAYBACK_MS) &&
@@ -137,31 +151,57 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
                         call.argument(BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS)
                     )
                 }
+
+                val textureId = newTextureId()
+//                val handle = textureRegistry.createSurfaceTexture()
+                val eventChannel = EventChannel(
+                    flutterState.binaryMessenger, EVENTS_CHANNEL + textureId
+                )
                 val player = PipFlutterPlayer(
-                    flutterState!!.applicationContext, eventChannel, handle,
+                    flutterState.applicationContext, eventChannel,textureId, //handle,
                     customDefaultLoadControl, result
                 )
-                videoPlayers.put(handle.id(), player)
+                videoPlayers.put(textureId, player)
             }
             PRE_CACHE_METHOD -> preCache(call, result)
             STOP_PRE_CACHE_METHOD -> stopPreCache(call, result)
             CLEAR_CACHE_METHOD -> clearCache(result)
             else -> {
-                val textureId = (call.argument<Any>(TEXTURE_ID_PARAMETER) as Number?)!!.toLong()
-                val player = videoPlayers[textureId]
-                if (player == null) {
-                    result.error(
-                        "Unknown textureId",
-                        "No video player associated with texture id $textureId",
-                        null
-                    )
-                    return
+                when (val textureId =
+                    (call.argument<Any>(TEXTURE_ID_PARAMETER) as? Number)?.toLong()) {
+                    is Long -> {
+                        val player = videoPlayers[textureId]
+                        if (player == null) {
+                            result.error(
+                                "Unknown textureId",
+                                "No video player associated with texture id $textureId",
+                                null
+                            )
+                            return
+                        }
+                        onMethodCall(call, result, textureId, player)
+                    }
+                    else -> {
+                        result.error(
+                            "Unknown textureId",
+                            "No video player associated with texture id $textureId",
+                            null
+                        )
+                        return
+                    }
                 }
-                onMethodCall(call, result, textureId, player)
+
             }
         }
     }
 
+    override fun create(context: Context?, viewId: Int, args: Any?): PlatformView {
+        val map = args as? Map<*, *>
+        val textureId = (map?.get(TEXTURE_ID_PARAMETER) as? Number)?.toLong()
+            ?: return FakePlatformView(context)
+        val player = videoPlayers[textureId]
+        return player ?: FakePlatformView(context)
+    }
 
     override fun onActivityPostResumed(activity: Activity) {
         super.onActivityPostResumed(activity)
@@ -179,7 +219,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
         val player = videoPlayers.valueAt(0)
         if (player.isPlaying() && !player.isPiping()) {
             Log.e(TAG, "onActivityPaused")
-            flutterState!!.invokeMethod("prepareToPip")
+            flutterState?.invokeMethod("prepareToPip")
         }
     }
 
@@ -194,7 +234,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
                     Activity::class.java
                 ) as List<Field?>
                 val field = allInstanceFields.stream()
-                    .filter { e: Field? -> e!!.name == "mCanEnterPictureInPicture" }
+                    .filter { e: Field? -> e?.name == "mCanEnterPictureInPicture" }
                     .findFirst().get()
                 field.isAccessible = true
                 field[activity] = true
@@ -214,7 +254,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
         if (activity.isInPictureInPictureMode) return
         val player = videoPlayers.valueAt(0)
         if (player.isPlaying() && player.isPiping()) {
-            flutterState!!.invokeMethod("exitPip")
+            flutterState?.invokeMethod("exitPip")
         }
     }
 
@@ -230,11 +270,11 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
                 setDataSource(call, result, player)
             }
             SET_LOOPING_METHOD -> {
-                player.setLooping(call.argument(LOOPING_PARAMETER)!!)
+                player.setLooping(call.argument(LOOPING_PARAMETER) ?: false)
                 result.success(null)
             }
             SET_VOLUME_METHOD -> {
-                player.setVolume(call.argument(VOLUME_PARAMETER)!!)
+                player.setVolume(call.argument(VOLUME_PARAMETER) ?: 1.0)
                 result.success(null)
             }
             PLAY_METHOD -> {
@@ -247,9 +287,21 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
                 result.success(null)
             }
             SEEK_TO_METHOD -> {
-                val location = (call.argument<Any>(LOCATION_PARAMETER) as Number?)!!.toInt()
-                player.seekTo(location)
-                result.success(null)
+                when (val location = (call.argument<Any>(LOCATION_PARAMETER) as? Number)?.toInt()) {
+                    is Int -> {
+                        player.seekTo(location)
+                        result.success(null)
+                    }
+                    else -> {
+                        result.error(
+                            "Unknown location",
+                            "No video player associated with location $location",
+                            null
+                        )
+                        return
+                    }
+                }
+
             }
             POSITION_METHOD -> {
                 result.success(player.position)
@@ -257,19 +309,24 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
             }
             ABSOLUTE_POSITION_METHOD -> result.success(player.absolutePosition)
             SET_SPEED_METHOD -> {
-                player.setSpeed(call.argument(SPEED_PARAMETER)!!)
+                player.setSpeed(call.argument(SPEED_PARAMETER) ?: 1.0)
                 result.success(null)
             }
             SET_TRACK_PARAMETERS_METHOD -> {
                 player.setTrackParameters(
-                    call.argument(WIDTH_PARAMETER)!!,
-                    call.argument(HEIGHT_PARAMETER)!!,
-                    call.argument(BITRATE_PARAMETER)!!
+                    (call.argument<Int>(WIDTH_PARAMETER) ?: 0.0).toInt(),
+                    (call.argument<Int>(HEIGHT_PARAMETER) ?: 0.0).toInt(),
+                    call.argument<Int>(BITRATE_PARAMETER) ?: 0
                 )
                 result.success(null)
             }
             ENABLE_PICTURE_IN_PICTURE_METHOD -> {
-                enablePictureInPicture(player)
+                enablePictureInPicture(player,
+                    (call.argument<Double>(TOP_PARAMETER) ?: 0.0).toInt(),
+                    (call.argument<Double>(LEFT_PARAMETER) ?: 0.0).toInt(),
+                    (call.argument<Double>(WIDTH_PARAMETER) ?: 0.0).toInt(),
+                    (call.argument<Double>(HEIGHT_PARAMETER) ?: 0.0).toInt(),
+                    )
                 result.success(null)
             }
             DISABLE_PICTURE_IN_PICTURE_METHOD -> {
@@ -308,67 +365,80 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
         result: MethodChannel.Result,
         player: PipFlutterPlayer
     ) {
-        val dataSource = call.argument<Map<String, Any?>>(DATA_SOURCE_PARAMETER)!!
-        dataSources.put(getTextureId(player)!!, dataSource)
+        val dataSource = call.argument<Map<String, Any?>>(DATA_SOURCE_PARAMETER) ?: mapOf()
+        val textureId = getTextureId(player)
+        if (textureId == null) {
+            result.error(
+                "textureId null",
+                "can not generate texture id",
+                null
+            )
+            return
+        }
+        dataSources.put(textureId, dataSource)
         val key = getParameter(dataSource, KEY_PARAMETER, "")
         val headers: Map<String, String> = getParameter(dataSource, HEADERS_PARAMETER, HashMap())
         val overriddenDuration: Number = getParameter(dataSource, OVERRIDDEN_DURATION_PARAMETER, 0)
-        if (dataSource[ASSET_PARAMETER] != null) {
-            val asset = getParameter(dataSource, ASSET_PARAMETER, "")
-            val assetLookupKey: String = if (dataSource[PACKAGE_PARAMETER] != null) {
-                val packageParameter = getParameter(
-                    dataSource,
-                    PACKAGE_PARAMETER,
-                    ""
+        val flutterState = flutterState
+        if (flutterState != null) {
+            if (dataSource[ASSET_PARAMETER] != null) {
+                val asset = getParameter(dataSource, ASSET_PARAMETER, "")
+                val assetLookupKey: String = if (dataSource[PACKAGE_PARAMETER] != null) {
+                    val packageParameter = getParameter(
+                        dataSource,
+                        PACKAGE_PARAMETER,
+                        ""
+                    )
+                    (flutterState.keyForAssetAndPackageName[asset, packageParameter])
+                } else {
+                    (flutterState.keyForAsset[asset])
+                }
+                player.setDataSource(
+                    flutterState.applicationContext,
+                    key,
+                    "asset:///$assetLookupKey",
+                    null,
+                    result,
+                    headers,
+                    false,
+                    0L,
+                    0L,
+                    overriddenDuration.toLong(),
+                    null,
+                    null, null, null
                 )
-                flutterState!!.keyForAssetAndPackageName[asset, packageParameter]
             } else {
-                flutterState!!.keyForAsset[asset]
+                val useCache = getParameter(dataSource, USE_CACHE_PARAMETER, false)
+                val maxCacheSizeNumber: Number =
+                    getParameter(dataSource, MAX_CACHE_SIZE_PARAMETER, 0)
+                val maxCacheFileSizeNumber: Number =
+                    getParameter(dataSource, MAX_CACHE_FILE_SIZE_PARAMETER, 0)
+                val maxCacheSize = maxCacheSizeNumber.toLong()
+                val maxCacheFileSize = maxCacheFileSizeNumber.toLong()
+                val uri = getParameter(dataSource, URI_PARAMETER, "")
+                val cacheKey = getParameter<String?>(dataSource, CACHE_KEY_PARAMETER, null)
+                val formatHint = getParameter<String?>(dataSource, FORMAT_HINT_PARAMETER, null)
+                val licenseUrl = getParameter<String?>(dataSource, LICENSE_URL_PARAMETER, null)
+                val clearKey = getParameter<String?>(dataSource, DRM_CLEARKEY_PARAMETER, null)
+                val drmHeaders: Map<String, String> =
+                    getParameter(dataSource, DRM_HEADERS_PARAMETER, HashMap())
+                player.setDataSource(
+                    flutterState.applicationContext,
+                    key,
+                    uri,
+                    formatHint,
+                    result,
+                    headers,
+                    useCache,
+                    maxCacheSize,
+                    maxCacheFileSize,
+                    overriddenDuration.toLong(),
+                    licenseUrl,
+                    drmHeaders,
+                    cacheKey,
+                    clearKey
+                )
             }
-            player.setDataSource(
-                flutterState!!.applicationContext,
-                key,
-                "asset:///$assetLookupKey",
-                null,
-                result,
-                headers,
-                false,
-                0L,
-                0L,
-                overriddenDuration.toLong(),
-                null,
-                null, null, null
-            )
-        } else {
-            val useCache = getParameter(dataSource, USE_CACHE_PARAMETER, false)
-            val maxCacheSizeNumber: Number = getParameter(dataSource, MAX_CACHE_SIZE_PARAMETER, 0)
-            val maxCacheFileSizeNumber: Number =
-                getParameter(dataSource, MAX_CACHE_FILE_SIZE_PARAMETER, 0)
-            val maxCacheSize = maxCacheSizeNumber.toLong()
-            val maxCacheFileSize = maxCacheFileSizeNumber.toLong()
-            val uri = getParameter(dataSource, URI_PARAMETER, "")
-            val cacheKey = getParameter<String?>(dataSource, CACHE_KEY_PARAMETER, null)
-            val formatHint = getParameter<String?>(dataSource, FORMAT_HINT_PARAMETER, null)
-            val licenseUrl = getParameter<String?>(dataSource, LICENSE_URL_PARAMETER, null)
-            val clearKey = getParameter<String?>(dataSource, DRM_CLEARKEY_PARAMETER, null)
-            val drmHeaders: Map<String, String> =
-                getParameter(dataSource, DRM_HEADERS_PARAMETER, HashMap())
-            player.setDataSource(
-                flutterState!!.applicationContext,
-                key,
-                uri,
-                formatHint,
-                result,
-                headers,
-                useCache,
-                maxCacheSize,
-                maxCacheFileSize,
-                overriddenDuration.toLong(),
-                licenseUrl,
-                drmHeaders,
-                cacheKey,
-                clearKey
-            )
         }
     }
 
@@ -444,7 +514,9 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
                 currentNotificationTextureId = textureId
                 removeOtherNotificationListeners()
                 val showNotification = getParameter(dataSource, SHOW_NOTIFICATION_PARAMETER, false)
-                if (showNotification) {
+
+                val flutterState = flutterState
+                if (showNotification && flutterState != null) {
                     val title = getParameter(dataSource, TITLE_PARAMETER, "")
                     val author = getParameter(dataSource, AUTHOR_PARAMETER, "")
                     val imageUrl = getParameter(dataSource, IMAGE_URL_PARAMETER, "")
@@ -454,7 +526,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
                     val activityName =
                         getParameter(dataSource, ACTIVITY_NAME_PARAMETER, "MainActivity")
                     pipFlutterPlayer.setupPlayerNotification(
-                        flutterState!!.applicationContext,
+                        flutterState.applicationContext,
                         title, author, imageUrl, notificationChannelName, activityName
                     )
                 }
@@ -472,7 +544,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
 
     @Suppress("UNCHECKED_CAST")
     private fun <T> getParameter(parameters: Map<String, Any?>?, key: String, defaultValue: T): T {
-        if (parameters!!.containsKey(key)) {
+        if (parameters?.containsKey(key) == true) {
             val value = parameters[key]
             if (value != null) {
                 return value as T
@@ -483,17 +555,27 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
 
 
     private fun isPictureInPictureSupported(): Boolean {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && activity != null && activity!!.packageManager
-            .hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && activity != null && activity?.packageManager?.hasSystemFeature(
+            PackageManager.FEATURE_PICTURE_IN_PICTURE
+        ) == true
     }
 
-    private fun enablePictureInPicture(player: PipFlutterPlayer) {
+    private fun enablePictureInPicture(player: PipFlutterPlayer,top:Int,left:Int,width:Int,height:Int) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val act = activity?:return
-            player.setupMediaSession(flutterState!!.applicationContext, true)
+            val act = activity ?: return
+            player.setupMediaSession(act.applicationContext, true)
             setCanEnterPictureInPicture(act)
-            setCanEnterPictureInPicture(act)
-            val result = act.enterPictureInPictureMode(PictureInPictureParams.Builder().build())
+//            val rational = Rational(8, 3) //这里如果设置的值太大或者太小或报异常
+            val rect = Rect(left, top, width, height)
+            val builder=PictureInPictureParams.Builder()
+//                .setAspectRatio(rational)
+//                .setSourceRectHint(rect)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                builder.setAutoEnterEnabled(true)
+                builder.setSeamlessResizeEnabled(true)
+            }
+
+            val result = act.enterPictureInPictureMode(builder.build())
             startPictureInPictureListenerTimer(player)
             player.onPictureInPictureStatusChanged(true)
 
@@ -502,51 +584,60 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
 
     private fun disablePictureInPicture(player: PipFlutterPlayer) {
         stopPipHandler()
-        activity!!.moveTaskToBack(false)
+        activity?.moveTaskToBack(false)
         player.onPictureInPictureStatusChanged(false)
         player.disposeMediaSession()
     }
 
     private fun startPictureInPictureListenerTimer(player: PipFlutterPlayer) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            pipHandler = Handler(Looper.getMainLooper())
-            pipRunnable = Runnable {
-                if (activity!!.isInPictureInPictureMode) {
-                    countingPlayer(player)
-                    pipHandler!!.postDelayed(pipRunnable!!, 100)
-                } else {
-
-
-                    player.onPictureInPictureStatusChanged(false)
-                    player.disposeMediaSession()
-                    stopPipHandler()
+            Handler(Looper.getMainLooper()).apply {
+                val that = this
+                pipHandler = that
+                Runnable {
+                    val pipRunnable = pipRunnable
+                    if (activity?.isInPictureInPictureMode == true) { //&&player.isPiping()
+//                    if (activity==null ||  activity?.isInPictureInPictureMode == true) {
+                        countingPlayer(player)
+                        if(pipRunnable!=null){
+                            pipHandler?.postDelayed(pipRunnable, 100)
+                        }
+                    } else {
+                        Log.wtf("${this.javaClass}","Runnable stop")
+                        player.onPictureInPictureStatusChanged(false)
+                        player.disposeMediaSession()
+                        stopPipHandler()
+                    }
+                }.apply {
+                    pipRunnable = this
+                    that.post(this)
                 }
             }
-            pipHandler!!.post(pipRunnable!!)
+
         }
     }
 
     private fun countingPlayer(player: PipFlutterPlayer) {
-        if(player.isPlaying()){
-            flutterState!!.invokeMethod("pipNotify", mapOf(
-                "position" to player.position,
-                "duration" to player.duration,
-            ))
+        if (player.isPlaying()) {
+            flutterState?.invokeMethod(
+                "pipNotify", mapOf(
+                    "position" to player.position,
+                    "duration" to player.duration,
+                )
+            )
         }
     }
 
     private fun dispose(player: PipFlutterPlayer, textureId: Long) {
-        player.dispose()
+        player.disposePlayer()
         videoPlayers.remove(textureId)
         dataSources.remove(textureId)
         stopPipHandler()
     }
 
     private fun stopPipHandler() {
-        if (pipHandler != null) {
-            pipHandler!!.removeCallbacksAndMessages(null)
-            pipHandler = null
-        }
+        pipHandler?.removeCallbacksAndMessages(null)
+        pipHandler = null
         pipRunnable = null
     }
 
@@ -563,7 +654,6 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
         val binaryMessenger: BinaryMessenger,
         val keyForAsset: KeyForAssetFn,
         val keyForAssetAndPackageName: KeyForAssetAndPackageName,
-        val textureRegistry: TextureRegistry?
     ) {
         private val methodChannel: MethodChannel = MethodChannel(binaryMessenger, CHANNEL)
 
@@ -664,5 +754,6 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
 
     override fun onActivityDestroyed(activity: Activity) {
     }
+
 
 }
