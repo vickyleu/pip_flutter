@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:pip_flutter/pipflutter_player_utils.dart';
@@ -454,15 +456,41 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
     });
   }
 
+  final viewType = 'com.pipflutter/pipflutter_player';
   @override
   Widget buildView(int? textureId) {
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return UiKitView(
-        viewType: 'com.pipflutter/pipflutter_player',
+        viewType: viewType,
         creationParamsCodec: const StandardMessageCodec(),
         creationParams: {'textureId': textureId!},
       );
     } else {
+      /*return PlatformViewLink(
+        viewType: viewType,
+        surfaceFactory:
+            (context, controller) {
+          return AndroidViewSurface(
+            controller: controller as AndroidViewController,
+            gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
+            hitTestBehavior: PlatformViewHitTestBehavior.opaque,
+          );
+        },
+        onCreatePlatformView: (params) {
+          return PlatformViewsService.initSurfaceAndroidView(
+            id: params.id,
+            viewType: viewType,
+            layoutDirection: TextDirection.ltr,
+            creationParams: {'textureId': textureId!},
+            creationParamsCodec: const StandardMessageCodec(),
+            onFocus: () {
+              params.onFocusChanged(true);
+            },
+          )
+            ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
+            ..create();
+        },
+      );*/
       return Texture(textureId: textureId!);
     }
   }

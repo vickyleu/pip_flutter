@@ -16,7 +16,9 @@ import android.os.Looper
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import android.util.AttributeSet
 import android.util.Log
+import android.util.Xml
 import android.view.Surface
 import androidx.lifecycle.Observer
 import androidx.media.session.MediaButtonReceiver
@@ -46,6 +48,8 @@ import com.google.android.exoplayer2.trackselection.TrackSelectionOverride
 import com.google.android.exoplayer2.ui.PlayerNotificationManager
 import com.google.android.exoplayer2.ui.PlayerNotificationManager.BitmapCallback
 import com.google.android.exoplayer2.ui.PlayerNotificationManager.MediaDescriptionAdapter
+import com.google.android.exoplayer2.ui.StyledPlayerControlView
+import com.google.android.exoplayer2.ui.StyledPlayerView
 import com.google.android.exoplayer2.upstream.DataSource
 import com.google.android.exoplayer2.upstream.DefaultDataSource
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
@@ -54,6 +58,7 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.EventChannel.EventSink
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.view.TextureRegistry.SurfaceTextureEntry
+import org.xmlpull.v1.XmlPullParser
 import java.io.File
 import java.util.*
 import kotlin.math.max
@@ -96,8 +101,20 @@ internal class PipFlutterPlayer(
             this.customDefaultLoadControl.bufferForPlaybackAfterRebufferMs
         )
         loadControl = loadBuilder.build()
+
+//        val parser: XmlPullParser = context.resources.getXml(R.xml.attrs)
+//        try {
+//            parser.next()
+//            parser.nextTag()
+//        } catch (e: java.lang.Exception) {
+//            e.printStackTrace()
+//        }
+//        val attr = Xml.asAttributeSet(parser)
+
+
         exoPlayer = ExoPlayer.Builder(context)//;SimpleExoPlayer.Builder(context)
             .setTrackSelector(trackSelector)
+            .setRenderersFactory(DefaultRenderersFactory(context))
             .setLoadControl(loadControl)
             .build()
         workManager = WorkManager.getInstance(context)
