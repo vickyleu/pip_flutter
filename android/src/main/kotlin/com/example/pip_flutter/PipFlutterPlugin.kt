@@ -14,6 +14,7 @@ import android.util.Log
 import android.util.LongSparseArray
 import android.util.Rational
 import com.example.pip_flutter.PipFlutterPlayerCache.releaseCache
+import com.google.android.exoplayer2.util.Log.LOG_LEVEL_ALL
 import com.google.android.exoplayer2.util.Log.LOG_LEVEL_OFF
 import io.flutter.embedding.engine.loader.FlutterLoader
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -31,7 +32,7 @@ import java.lang.reflect.Field
  * Android platform implementation of the VideoPlayerPlugin.
  */
 class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
-    Application.ActivityLifecycleCallbacks, PlatformViewFactory(StandardMessageCodec()) {
+    Application.ActivityLifecycleCallbacks, PlatformViewFactory(StandardMessageCodec.INSTANCE) {
     private val videoPlayers = LongSparseArray<PipFlutterPlayer>()
     private val dataSources = LongSparseArray<Map<String, Any?>>()
     private var flutterState: FlutterState? = null
@@ -52,7 +53,10 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
 
     override fun onAttachedToEngine(binding: FlutterPluginBinding) {
         Log.e("CALLMETHOD", "onAttachedToEngine: ")
-        com.google.android.exoplayer2.util.Log.setLogLevel(LOG_LEVEL_OFF)
+        com.google.android.exoplayer2.util.Log.setLogLevel(LOG_LEVEL_ALL)
+//        com.google.android.exoplayer2.util.Log.setLogLevel(LOG_LEVEL_OFF)
+        binding.platformViewRegistry.registerViewFactory("com.pipflutter/pipflutter_player",this)
+
         val loader = FlutterLoader()
         flutterState = FlutterState(
             binding.applicationContext,
@@ -74,7 +78,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
             },
         )
         flutterState?.startListening(this)
-        binding.platformViewRegistry.registerViewFactory("com.pipflutter/pipflutter_player",this)
+
     }
 
 
@@ -198,8 +202,10 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
     override fun create(context: Context?, viewId: Int, args: Any?): PlatformView {
         val map = args as? Map<*, *>
         val textureId = (map?.get(TEXTURE_ID_PARAMETER) as? Number)?.toLong()
-            ?: return FakePlatformView(context)
+        Log.wtf("createForContext","textureId:${textureId}")
+        if(textureId==null)return  FakePlatformView(context)
         val player = videoPlayers[textureId]
+        Log.wtf("createForContext","player:${player}")
         return player ?: FakePlatformView(context)
     }
 
@@ -249,13 +255,13 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
     }
 
     override fun onActivityResumed(activity: Activity) {
-        if (videoPlayers.size() != 1) return
+       /* if (videoPlayers.size() != 1) return
         if (activity != this.activity || !isPictureInPictureSupported()) return
         if (activity.isInPictureInPictureMode) return
         val player = videoPlayers.valueAt(0)
         if (player.isPlaying() && player.isPiping()) {
-            flutterState?.invokeMethod("exitPip")
-        }
+//            flutterState?.invokeMethod("exitPip")
+        }*/
     }
 
 
