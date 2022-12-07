@@ -390,8 +390,8 @@ internal class PipFlutterPlayer(
             addListener(object : Player.Listener {
                 override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                     super.onPlayWhenReadyChanged(playWhenReady, reason)
-                    ///TODO 视频流准备好时自动触发暂停和播放,看不懂是什么鬼操作
-                    /*if (playWhenReady) {
+                   /* ///TODO 视频流准备好时自动触发暂停和播放,看不懂是什么鬼操作
+                    if (playWhenReady) {
                         sendEvent("pause")
                     } else {
                         sendEvent("play")
@@ -412,6 +412,16 @@ internal class PipFlutterPlayer(
 
                 override fun onMaxSeekToPreviousPositionChanged(maxSeekToPreviousPositionMs: Long) {
                     super.onMaxSeekToPreviousPositionChanged(maxSeekToPreviousPositionMs)
+                }
+
+                override fun onEvents(player: Player, events: Player.Events) {
+                    super.onEvents(player, events)
+                    Log.wtf("${this@PipFlutterPlayer.javaClass}","onEvents:$events")
+                }
+
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    super.onIsPlayingChanged(isPlaying)
+                    Log.wtf("${this@PipFlutterPlayer.javaClass}","onIsPlayingChanged:$isPlaying")
                 }
 
             })

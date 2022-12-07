@@ -23,7 +23,8 @@ export 'package:pip_flutter/pipflutter_player_configuration.dart';
 export 'package:pip_flutter/pipflutter_player_controller.dart';
 export 'package:pip_flutter/pipflutter_player_data_source.dart';
 export 'package:pip_flutter/pipflutter_player_data_source_type.dart';
-
+export 'package:pip_flutter/pipflutter_player_event.dart';
+export 'package:pip_flutter/pipflutter_player_event_type.dart';
 ///Widget which uses provided controller to render video player.
 class PipFlutterPlayer extends StatefulWidget {
   const PipFlutterPlayer({Key? key, required this.controller})
