@@ -172,8 +172,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
     }
 
 
-    override fun onActivityPostPaused(activity: Activity) {
-        super.onActivityPostPaused(activity)
+    override fun onActivityPrePaused(activity: Activity) {
         if (videoPlayers.size() != 1) return
         if (activity != this.activity || !isPictureInPictureSupported()) return
         val player = videoPlayers.valueAt(0)
@@ -181,6 +180,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
             Log.e(TAG, "onActivityPaused")
             flutterState!!.invokeMethod("prepareToPip")
         }
+        super.onActivityPrePaused(activity)
     }
 
 
