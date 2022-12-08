@@ -100,6 +100,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         if #available(iOS 10.0, *) {
             self.player.automaticallyWaitsToMinimizeStalling = false
         }
+       
         self.observersAdded = false
     }
 
@@ -111,9 +112,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
 
     func addObservers(item:AVPlayerItem!) {
         if !self.observersAdded {
-            player.addObserver(self, forKeyPath: "timeControlStatus", options: .new, context: nil)//监听 timeControlStatus（为了监听画中画模式的暂停播放）
-            
-            player.addObserver(self, forKeyPath:"rate", options:.new, context:nil)
+            player.addObserver(self, forKeyPath:"rate", options:.new, context:nil) //监听 timeControlStatus（为了监听画中画模式的暂停播放）
             item.addObserver(self, forKeyPath:"loadedTimeRanges", options:.new, context:timeRangeContext)
             item.addObserver(self, forKeyPath:"status", options:.new, context:statusContext)
             item.addObserver(self, forKeyPath:"presentationSize", options:.new, context:presentationSizeContext)
@@ -153,7 +152,6 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
 
     func removeObservers() {
         if self.observersAdded {
-            player.removeObserver(self, forKeyPath: "timeControlStatus")//监听 timeControlStatus（为了监听画中画模式的暂停播放）
             player.removeObserver(self, forKeyPath:"rate", context:nil)
             player.currentItem?.removeObserver(self, forKeyPath:"status", context:statusContext)
             player.currentItem?.removeObserver(self, forKeyPath:"presentationSize", context:presentationSizeContext)
@@ -417,23 +415,6 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
                 self.handleStalled()
             }
         }
-        else if(keyPath == "timeControlStatus"){
-            if self.pipController?.isPictureInPictureActive == true{
-                // 获取当前的播放状态
-                let timeControlStatus = player.timeControlStatus
-
-            
-                    ///TODO 监听播放器画中画的状态
-               if timeControlStatus == .paused {
-                                // 暂停播放，可以在这里执行相应的处理
-                   self.eventSink?(["event" : "pause"])
-                } else if timeControlStatus == .playing {
-                                // 正在播放，可以在这里执行相应的处理
-                    self.eventSink?(["event" : "play"])
-               }
-            }
-            return
-        }
 
         var context = context
         if context != nil{
@@ -667,6 +648,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
 
     func setPictureInPicture(pictureInPicture:Bool) {
         self.pictureInPicture = pictureInPicture
+      
         if #available(iOS 9.0, *) {
             if (self.pipController != nil) && self.pictureInPicture && !self.pipController!.isPictureInPictureActive {
                
@@ -709,27 +691,29 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     }
 
     func enablePictureInPicture(frame:CGRect) {
-
-        self.disablePictureInPicture()
         self.usePlayerLayer(frame: frame)
     }
 
 
     func playerLayerSetup(frame:CGRect) {
-        if (self.player != nil) {
-            // Create new controller passing reference to the AVPlayerLayer
-            self.playerLayer = AVPlayerLayer(player: self.player)
-            let vc = UIApplication.shared.keyWindow!.rootViewController!
-            self.playerLayer!.frame = frame
-            self.playerLayer!.needsDisplayOnBoundsChange = true
-            //  [self._playerLayer addObserver:self forKeyPath:readyForDisplayKeyPath options:NSKeyValueObservingOptionNew context:nil];
-            vc.view.layer.addSublayer(self.playerLayer!)
-            vc.view.layer.needsDisplayOnBoundsChange = true
-            if #available(iOS 9.0, *) {
-                self.pipController = nil
-            }
-            self.setupPipController()
+//        self.setPictureInPicture(pictureInPicture: false)
+        self.pictureInPicture = false
+        if (self.playerLayer != nil) {
+            self.playerLayer!.removeFromSuperlayer()
+            self.playerLayer = nil
         }
+        // Create new controller passing reference to the AVPlayerLayer
+        self.playerLayer = AVPlayerLayer(player: self.player)
+        let vc = UIApplication.shared.keyWindow!.rootViewController!
+        self.playerLayer!.frame = frame
+        self.playerLayer!.needsDisplayOnBoundsChange = true
+        //  [self._playerLayer addObserver:self forKeyPath:readyForDisplayKeyPath options:NSKeyValueObservingOptionNew context:nil];
+        vc.view.layer.addSublayer(self.playerLayer!)
+        vc.view.layer.needsDisplayOnBoundsChange = true
+        if #available(iOS 9.0, *) {
+            self.pipController = nil
+        }
+        self.setupPipController()
     }
 
 
@@ -737,47 +721,67 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         if (self.playerLayer == nil) {
             return
         }
-        DispatchQueue.main.asyncAfter(deadline: .now()+0.2, execute:
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(200), execute:
          {
             self.setPictureInPicture(pictureInPicture: true)
           })
     }
 
     func disablePictureInPicture() {
-        self.setPictureInPicture(pictureInPicture: false)
-        NSLog("applicationWillEnterForeground disablePictureInPicture")
-        if (self.playerLayer != nil) {
-            self.playerLayer!.removeFromSuperlayer()
-            self.playerLayer = nil
-            self.eventSink?(["event" : "pipStop"])
-        }
+        
+//        print("applicationWillEnterForeground disablePictureInPicture\n")
+//        let vc = UIApplication.shared.keyWindow!.rootViewController!
+//          
+//        self.playerLayer?.removeFromSuperlayer()
+//        self.playerLayer = nil
+
+      
+//        DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + .milliseconds(1500), execute: {
+//            DispatchQueue.main.async {
+//                self.setPictureInPicture(pictureInPicture: false)
+//                if (self.playerLayer != nil) {
+//                    self.playerLayer!.removeFromSuperlayer()
+//                    self.playerLayer = nil
+//                }
+//                vc.view.layer.needsDisplayOnBoundsChange = true
+//                self.eventSink?(["event" : "pipStop"])
+//            }
+//        })
+        
+       
     }
     
     public func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-        self.disablePictureInPicture()
+        print("pictureInPictureControllerDidStopPictureInPicture")
+//        self.disablePictureInPicture()
     }
 
     public func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         self.eventSink?(["event" : "pipStart"])
+        print("pictureInPictureControllerDidStartPictureInPicture")
     }
 
 
     public func pictureInPictureControllerWillStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-        
+        print("pictureInPictureControllerWillStopPictureInPicture")
     }
     
     
     public func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-        
+        print("pictureInPictureControllerWillStartPictureInPicture")
     }
 
     public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
         //画中画播放器启动失败
+        print("failedToStartPictureInPictureWithError")
     }
 
     public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
+        
         self.setRestoreUserInterfaceForPIPStopCompletionHandler(restore: true)
+        
         //画中画播放停止的事件
+        print("restoreUserInterfaceForPictureInPictureStopWithCompletionHandler")
     }
 
     func setAudioTrack(_ name:String, index:Int) {

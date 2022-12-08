@@ -112,12 +112,14 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
             $0.1
         }
         let player = players.last
+        
         if player != nil && player!.isPlaying && player!.isPiping {
             self.channel.invokeMethod("exitPip", arguments: nil)
         }
         self.bgTask = .invalid
         self.isInPipMode = false
         print("applicationWillEnterForeground exitPip")
+        
 
     }
 
@@ -320,7 +322,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                     nowPlayingInfoDict[MPMediaItemPropertyArtwork] = artworkImage
                     MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfoDict
                 } else {
-                    DispatchQueue.global(qos: .default).async {
+                    DispatchQueue.global(qos: .userInteractive).async {
                         do {
                             var tempArtworkImage: UIImage?
                             if !imageUrl!.contains("http") {
@@ -329,8 +331,10 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                                 tempArtworkImage = UIImage.init(data: try Data.init(contentsOf: URL.init(string: imageUrl!)!))
                             }
                             if tempArtworkImage != nil {
-                                let artworkImage = MPMediaItemArtwork.init(boundsSize: tempArtworkImage!.size) { size in
-                                    tempArtworkImage!
+                                let image = tempArtworkImage!
+                                let boundsSize = CGSize(width: image.size.width, height: image.size.height)
+                                let artworkImage = MPMediaItemArtwork.init(boundsSize: boundsSize) { size in
+                                    return image
                                 }
                                 self._artworkImageDict[key] = artworkImage
                                 nowPlayingInfoDict[MPMediaItemPropertyArtwork] = artworkImage
@@ -486,7 +490,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 // TODO(cyanglaz): Remove this dispatch block when
                 // https://github.com/flutter/flutter/commit/8159a9906095efc9af8b223f5e232cb63542ad0b is in
                 // stable And update the min flutter version of the plugin to the stable version.
-                DispatchQueue.main.asyncAfter(deadline: .now()+1, execute:
+                DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1), execute:
                 {
                     if !player.disposed{
                         player.dispose()

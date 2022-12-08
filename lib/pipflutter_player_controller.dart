@@ -808,6 +808,7 @@ class PipFlutterPlayerController {
 
   ///Listener used to handle video player changes.
   void _onVideoPlayerChanged() async {
+    print("统计回放播放时长 _onVideoPlayerChanged ");
     final VideoPlayerValue currentVideoPlayerValue =
         videoPlayerController?.value ??
             VideoPlayerValue(duration: const Duration());
@@ -1128,7 +1129,7 @@ class PipFlutterPlayerController {
         _postEvent(PipFlutterPlayerEvent(PipFlutterPlayerEventType.pipStart));
         return;
       }
-      if (Platform.isIOS) {
+      else if (Platform.isIOS) {
         final RenderBox? renderBox = pipFlutterPlayerGlobalKey.currentContext!
             .findRenderObject() as RenderBox?;
         if (renderBox == null) {
@@ -1138,12 +1139,14 @@ class PipFlutterPlayerController {
           return;
         }
         final Offset position = renderBox.localToGlobal(Offset.zero);
-        return videoPlayerController?.enablePictureInPicture(
+         final fu = videoPlayerController?.enablePictureInPicture(
           left: position.dx,
           top: position.dy,
           width: renderBox.size.width,
           height: renderBox.size.height,
         );
+        _postEvent(PipFlutterPlayerEvent(PipFlutterPlayerEventType.pipStart));
+        return fu;
       } else {
         PipFlutterPlayerUtils.log("Unsupported PiP in current platform.");
       }

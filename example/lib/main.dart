@@ -126,6 +126,8 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
   }
 
   void getPlayerEvent(PipFlutterPlayerEvent event) {
+    print(
+        "统计回放播放时长 event:${event.pipFlutterPlayerEventType.name} ${event.parameters}");
     switch (event.pipFlutterPlayerEventType) {
       case PipFlutterPlayerEventType.progress:
         {

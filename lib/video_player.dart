@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -168,6 +169,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   VideoPipLifeCycleCallback? pipLifeCycleCallback;
   VideoPipFrameCallback? pipFrameCallback;
   VideoPipInBackgroundCallback? pipInBackgroundCallback;
+
   /// Constructs a [VideoPlayerController] and creates video controller on platform side.
   VideoPlayerController({
     this.bufferingConfiguration =
@@ -242,19 +244,24 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           break;
 
         case VideoEventType.play:
-          play();//TODO check this !!!!
+          play(); //TODO check this !!!!
           break;
         case VideoEventType.pause:
-          pause();//TODO check this !!!!
+          pause(); //TODO check this !!!!
           break;
         case VideoEventType.seek:
           seekTo(event.position);
           break;
         case VideoEventType.pipStart:
+          //收到pipStart
+          print("统计回放播放时长 VideoEventType.pipStart ");
           value = value.copyWith(isPip: true);
           break;
         case VideoEventType.pipStop:
+        //收到pipStart
+          print("统计回放播放时长 VideoEventType.pipStop ");
           value = value.copyWith(isPip: false);
+          // value.notifyListener();
           break;
         case VideoEventType.unknown:
           break;
@@ -280,7 +287,8 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
     VideoPlayerPlatform.instance.setPipLifeCycleCallback(pipLifeCycleCallback);
     VideoPlayerPlatform.instance.setPipFrameCallback(pipFrameCallback);
-    VideoPlayerPlatform.instance.setPipInBackgroundCallback(pipInBackgroundCallback);
+    VideoPlayerPlatform.instance
+        .setPipInBackgroundCallback(pipInBackgroundCallback);
   }
 
   /// Set data source for playing a video from an asset.
@@ -313,6 +321,12 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         activityName: activityName,
       ),
     );
+  }
+
+  @override
+  void notifyListeners() {
+    print("${this.runtimeType} 统计回放播放时长 notifyListeners::${StackTrace.current}");
+    super.notifyListeners();
   }
 
   /// Set data source for playing a video from obtained from
@@ -428,8 +442,8 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       await _eventSubscription?.cancel();
       await _videoPlayerPlatform.dispose(_textureId);
       videoEventStreamController.close();
-      pipLifeCycleCallback=null;
-      pipInBackgroundCallback=null;
+      pipLifeCycleCallback = null;
+      pipInBackgroundCallback = null;
       VideoPlayerPlatform.instance.setPipLifeCycleCallback(null);
       VideoPlayerPlatform.instance.setPipInBackgroundCallback(null);
     }
@@ -471,11 +485,11 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     if (!_created || _isDisposed) {
       return;
     }
-    bool firstApply=false;
-    if(_timer!=null){
+    bool firstApply = false;
+    if (_timer != null) {
       _timer?.cancel();
-    }else{
-      firstApply=true;
+    } else {
+      firstApply = true;
     }
     //firstApply ||
     if ((value.isPlaying)) {
@@ -612,12 +626,12 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     await _videoPlayerPlatform.enablePictureInPicture(
         textureId, top, left, width, height);
   }
+
   Future<void> enablePictureInPictureFrame(
       {double? top, double? left, double? width, double? height}) async {
     await _videoPlayerPlatform.enablePictureInPictureFrame(
         textureId, top, left, width, height);
   }
-
 
   Future<void> disablePictureInPicture() async {
     await _videoPlayerPlatform.disablePictureInPicture(textureId);

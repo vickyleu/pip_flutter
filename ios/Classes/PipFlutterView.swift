@@ -12,7 +12,10 @@ import AVFoundation
 class PipFlutterView : UIView {
     var player:AVPlayer!{
         get{self.playerLayer.player}
-        set{self.playerLayer.player = newValue}
+        set{
+            
+            self.playerLayer.player = newValue
+        }
     }
     var playerLayer:AVPlayerLayer
     {
