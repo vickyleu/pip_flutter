@@ -830,7 +830,8 @@ class PipFlutterPlayerController {
     }
     if (currentVideoPlayerValue.isPip) {
       _wasInPipMode = true;
-    } else if (_wasInPipMode) {
+    }
+    else if (_wasInPipMode) {
       _postEvent(PipFlutterPlayerEvent(PipFlutterPlayerEventType.pipStop));
       _wasInPipMode = false;
       if (!_wasInFullScreenBeforePiP) {
@@ -849,15 +850,19 @@ class PipFlutterPlayerController {
     final int now = DateTime.now().millisecondsSinceEpoch;
     if (now - _lastPositionSelection > 500) {
       _lastPositionSelection = now;
-      _postEvent(
-        PipFlutterPlayerEvent(
-          PipFlutterPlayerEventType.progress,
-          parameters: <String, dynamic>{
-            _progressParameter: currentVideoPlayerValue.position,
-            _durationParameter: currentVideoPlayerValue.duration
-          },
-        ),
-      );
+
+      if(currentVideoPlayerValue.isPlaying || currentVideoPlayerValue.isBuffering){
+        _postEvent(
+          PipFlutterPlayerEvent(
+            PipFlutterPlayerEventType.progress,
+            parameters: <String, dynamic>{
+              _progressParameter: currentVideoPlayerValue.position,
+              _durationParameter: currentVideoPlayerValue.duration
+            },
+          ),
+        );
+      }
+
     }
   }
 

@@ -1,18 +1,22 @@
 package com.example.pip_flutter
 
-import android.app.Activity
-import android.app.Application
-import android.app.PictureInPictureParams
+import android.app.*
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.graphics.Rect
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.util.LongSparseArray
+import androidx.annotation.RequiresApi
 import com.example.pip_flutter.PipFlutterPlayerCache.releaseCache
+import com.google.android.exoplayer2.ui.PlayerNotificationManager.ACTION_PAUSE
+import com.google.android.exoplayer2.ui.PlayerNotificationManager.ACTION_PLAY
 import com.google.android.exoplayer2.util.Log.LOG_LEVEL_OFF
 import io.flutter.embedding.engine.loader.FlutterLoader
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -27,6 +31,7 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.view.TextureRegistry
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import java.lang.reflect.Field
+
 
 /**
  * Android platform implementation of the VideoPlayerPlugin.
@@ -176,13 +181,23 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
         if (videoPlayers.size() != 1) return
         if (activity != this.activity || !isPictureInPictureSupported()) return
         val player = videoPlayers.valueAt(0)
-        if (player.isPlaying() && !player.isPiping()) {
+        if ((player.isPlaying() || player.isBuffering()) && !player.isPiping()) {
             Log.e(TAG, "onActivityPaused")
             flutterState!!.invokeMethod("prepareToPip")
         }
         super.onActivityPrePaused(activity)
     }
 
+
+    override fun onActivityResumed(activity: Activity) {
+        if (videoPlayers.size() != 1) return
+        if (activity != this.activity || !isPictureInPictureSupported()) return
+        if (activity.isInPictureInPictureMode) return
+        val player = videoPlayers.valueAt(0)
+        if ((player.isPlaying() || player.isBuffering()) && player.isPiping()) {
+            flutterState!!.invokeMethod("exitPip")
+        }
+    }
 
     /**
      * Activity mCanEnterPictureInPicture  wasn't update by performResume,should change it by private api
@@ -205,16 +220,6 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
             }
         } catch (e: Exception) {
             e.printStackTrace()
-        }
-    }
-
-    override fun onActivityResumed(activity: Activity) {
-        if (videoPlayers.size() != 1) return
-        if (activity != this.activity || !isPictureInPictureSupported()) return
-        if (activity.isInPictureInPictureMode) return
-        val player = videoPlayers.valueAt(0)
-        if (player.isPlaying() && player.isPiping()) {
-            flutterState!!.invokeMethod("exitPip")
         }
     }
 
@@ -269,11 +274,11 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
                 result.success(null)
             }
             ENABLE_PICTURE_IN_PICTURE_METHOD -> {
-                enablePictureInPicture(player)
+                enablePictureInPicture(player, textureId)
                 result.success(null)
             }
             DISABLE_PICTURE_IN_PICTURE_METHOD -> {
-                disablePictureInPicture(player)
+                disablePictureInPicture(player, textureId)
                 result.success(null)
             }
             IS_PICTURE_IN_PICTURE_SUPPORTED_METHOD -> result.success(
@@ -487,24 +492,172 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
             .hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
     }
 
-    private fun enablePictureInPicture(player: PipFlutterPlayer) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val act = activity?:return
-            player.setupMediaSession(flutterState!!.applicationContext, true)
-            setCanEnterPictureInPicture(act)
-            setCanEnterPictureInPicture(act)
-            val result = act.enterPictureInPictureMode(PictureInPictureParams.Builder().build())
-            startPictureInPictureListenerTimer(player)
-            player.onPictureInPictureStatusChanged(true)
+    private val REQUEST_PLAY = 1008610
+    private val REQUEST_PAUSE = 1008611
+    private val REQUEST_REPLAY = 1008612
 
+    // Create a BroadcastReceiver to handle the pause action.
+    private val mReceiver = object : BroadcastReceiver() {
+        @RequiresApi(Build.VERSION_CODES.O)
+        override fun onReceive(context: Context, intent: Intent) {
+            if (arrayListOf(ACTION_PAUSE, ACTION_PLAY, ACTION_REPLAY).contains(intent.action)) {
+                val textureId = intent.extras?.getLong(TEXTURE_ID_PARAMETER, -1) ?: -1
+                val act = activity ?: return
+                val applicationContext = act.applicationContext
+                if (textureId == (-1).toLong()) return
+                val player = videoPlayers[textureId] ?: return
+                val event: MutableMap<String, Any> = java.util.HashMap()
+                if (intent.action == ACTION_REPLAY) {
+                    // Handle the pause action.
+                    player.playFromStart()
+                    event["event"] = "play"
+                    player.eventSink.success(event)
+                    act.setPictureInPictureParams(
+                        getPictureInPictureParams(
+                            applicationContext,
+                            textureId,
+                            true
+                        )
+                    )
+                } else if (intent.action == ACTION_PAUSE) {
+                    // Handle the pause action.
+                    event["event"] = "pause"
+                    player.eventSink.success(event)
+                    act.setPictureInPictureParams(
+                        getPictureInPictureParams(
+                            applicationContext,
+                            textureId,
+                            false
+                        )
+                    )
+                } else if (intent.action == ACTION_PLAY) {
+                    // Handle the play action.
+                    event["event"] = "play"
+                    player.eventSink.success(event)
+                    act.setPictureInPictureParams(
+                        getPictureInPictureParams(
+                            applicationContext,
+                            textureId,
+                            true
+                        )
+                    )
+                }
+            }
         }
     }
 
-    private fun disablePictureInPicture(player: PipFlutterPlayer) {
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun getPictureInPictureParams(
+        applicationContext: Context,
+        textureId: Long, isPlaying: Boolean, restart: Boolean = false
+    ): PictureInPictureParams {
+        val builder = PictureInPictureParams.Builder()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setSeamlessResizeEnabled(false)
+        }
+        val str = if (restart) {
+            "Replay"
+        } else {
+            if (isPlaying) {
+                "Pause"
+            } else {
+                "Play"
+            }
+        }
+        return builder.setActions(
+            arrayListOf<RemoteAction>().apply {
+                add(
+                    RemoteAction(
+                        Icon.createWithResource(
+                            applicationContext,
+                            if (restart) {
+                                R.mipmap.ic_pip_replay
+                            } else {
+                                if (isPlaying) {
+                                    R.mipmap.ic_pip_pause
+                                } else {
+                                    R.mipmap.ic_pip_play
+                                }
+                            },
+                        ),
+                        str,
+                        "${str} the video",
+                        PendingIntent.getBroadcast(
+                            applicationContext,
+                            if (restart) {
+                                REQUEST_REPLAY
+                            } else {
+                                if (isPlaying) {
+                                    REQUEST_PAUSE
+                                } else {
+                                    REQUEST_PLAY
+                                }
+                            },
+                            Intent(
+                                if (restart) {
+                                    ACTION_REPLAY
+                                } else {
+                                    if (isPlaying) {
+                                        ACTION_PAUSE
+                                    } else {
+                                        ACTION_PLAY
+                                    }
+                                }
+                            )
+                                .apply {
+                                    putExtra(TEXTURE_ID_PARAMETER, textureId)
+                                },
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                        )
+                    )
+                )
+            })
+            .build()
+
+    }
+
+
+    private fun enablePictureInPicture(player: PipFlutterPlayer, textureId: Long) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val act = activity ?: return
+            player.setupMediaSession(flutterState!!.applicationContext, true)
+            setCanEnterPictureInPicture(act)
+            val applicationContext = act.applicationContext
+            val result = act.enterPictureInPictureMode(
+                getPictureInPictureParams(applicationContext, textureId, true)
+            )
+            startPictureInPictureListenerTimer(player)
+            player.onPictureInPictureStatusChanged(true)
+
+            player.setOnStopListener {
+                act.setPictureInPictureParams(
+                    getPictureInPictureParams(
+                        applicationContext,
+                        textureId,
+                        false,
+                        restart = true
+                    )
+                )
+            }
+            // Register the receiver to receive the specified broadcasts.
+            applicationContext.registerReceiver(mReceiver, IntentFilter().apply {
+                addAction(ACTION_PAUSE)
+                addAction(ACTION_PLAY)
+                addAction(ACTION_REPLAY)
+            })
+        }
+    }
+
+
+    private fun disablePictureInPicture(player: PipFlutterPlayer, textureId: Long) {
         stopPipHandler()
-        activity!!.moveTaskToBack(false)
+        val act = activity ?: return
+        val applicationContext = act.applicationContext
+        act.moveTaskToBack(false)
         player.onPictureInPictureStatusChanged(false)
         player.disposeMediaSession()
+        player.setOnStopListener(null)
+        applicationContext.unregisterReceiver(mReceiver)
     }
 
     private fun startPictureInPictureListenerTimer(player: PipFlutterPlayer) {
@@ -527,11 +680,13 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
     }
 
     private fun countingPlayer(player: PipFlutterPlayer) {
-        if(player.isPlaying()){
-            flutterState!!.invokeMethod("pipNotify", mapOf(
-                "position" to player.position,
-                "duration" to player.duration,
-            ))
+        if (player.isPlaying()) {
+            flutterState!!.invokeMethod(
+                "pipNotify", mapOf(
+                    "position" to player.position,
+                    "duration" to player.duration,
+                )
+            )
         }
     }
 
@@ -584,6 +739,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
     companion object {
         private const val TAG = "PipFlutterPlayerPlugin"
         private const val CHANNEL = "pipflutter_player_channel"
+        private const val ACTION_REPLAY = "pip_action_replay"
         private const val EVENTS_CHANNEL = "pipflutter_player_channel/videoEvents"
         private const val DATA_SOURCE_PARAMETER = "dataSource"
         private const val KEY_PARAMETER = "key"

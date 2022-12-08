@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pip_flutter/pipflutter_player.dart';
@@ -82,33 +80,32 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
   @override
   void initState() {
     PipFlutterPlayerConfiguration pipFlutterPlayerConfiguration =
-        const PipFlutterPlayerConfiguration(
-      aspectRatio: 16 / 9,
-      autoPlay: true,
-      fit: BoxFit.contain,
-    );
+        PipFlutterPlayerConfiguration(
+            aspectRatio: 16 / 9,
+            autoPlay: true,
+            fit: BoxFit.contain,
+            eventListener: (PipFlutterPlayerEvent event) {
+              getPlayerEvent(event);
+              return;
+            });
 
     bool isReviewing = false;
 
     pipFlutterPlayerController = PipFlutterPlayerController(
-        pipFlutterPlayerConfiguration,
-        pipLifeCycleCallback: (open) {
-          if (open) {
-          pipFlutterPlayerController.enablePictureInPicture(pipFlutterPlayerKey);
+        pipFlutterPlayerConfiguration, pipLifeCycleCallback: (open) {
+      if (open) {
+        pipFlutterPlayerController.enablePictureInPicture(pipFlutterPlayerKey);
+      } else {
+        pipFlutterPlayerController.disablePictureInPicture();
       }
-          else {
-            pipFlutterPlayerController.disablePictureInPicture();
-          }
-    },
-        pipFrameCallback: (){
-          if(!isReviewing){
-            pipFlutterPlayerController.enablePictureInPictureFrame(pipFlutterPlayerKey);
-          }
-    },
-        pipInBackgroundCallback: (position,duration){
-          print("PictureInPicture === >>position=>$position duration=>$duration");
-        }
-    );
+    }, pipFrameCallback: () {
+      if (!isReviewing) {
+        pipFlutterPlayerController
+            .enablePictureInPictureFrame(pipFlutterPlayerKey);
+      }
+    }, pipInBackgroundCallback: (position, duration) {
+      print("PictureInPicture === >>position=>$position duration=>$duration");
+    });
     pipFlutterPlayerController.setupDataSource(PipFlutterPlayerDataSource(
         PipFlutterPlayerDataSourceType.network,
         'https://sourceqn3.uooconline.com/course900/20210207%E4%BF%AE%E6%94%B9%E4%B8%8A%E4%BC%A0%E6%9B%B4%E6%96%B0/1.3%E5%85%AC%E5%8F%B8%E5%88%B6%E4%BC%81%E4%B8%9A.mp4',
@@ -122,12 +119,118 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
           author: '漫威宇宙',
           imageUrl:
               'https://img0.baidu.com/it/u=248545255,575820690&fm=253&fmt=auto&app=138&f=JPEG',
-        )
-    )
-    );
+        )));
     pipFlutterPlayerController
         .setPipFlutterPlayerGlobalKey(pipFlutterPlayerKey);
     super.initState();
+  }
+
+  void getPlayerEvent(PipFlutterPlayerEvent event) {
+    switch (event.pipFlutterPlayerEventType) {
+      case PipFlutterPlayerEventType.progress:
+        {
+          final Duration progress = event.parameters!['progress'];
+          final Duration duration = event.parameters!['duration'];
+          /*print(
+              "统计回放播放时长 当前进度:progress:${
+                  (progress.inMilliseconds.toDouble()/1000.0).toDouble().toStringAsFixed(3)
+              } duration:${
+                  (duration.inMilliseconds.toDouble()/1000.0).toDouble().toStringAsFixed(3)
+              }");*/
+        }
+        break;
+      case PipFlutterPlayerEventType.play:
+        {
+          print("统计回放播放时长 当前开始播放");
+        }
+        break;
+      case PipFlutterPlayerEventType.pause:
+        {
+          print("统计回放播放时长 当前暂停播放");
+        }
+        break;
+      case PipFlutterPlayerEventType.finished:
+        {
+          print("统计回放播放时长 当前完成播放");
+        }
+        break;
+      case PipFlutterPlayerEventType.pipStart:
+        {
+          print("统计回放播放时长 进入画中画了");
+        }
+        break;
+      case PipFlutterPlayerEventType.pipStop:
+        {
+          print("统计回放播放时长 停止画中画了");
+        }
+        break;
+      case PipFlutterPlayerEventType.exception:
+        {
+          print("统计回放播放时长 播放错误了${event.parameters}");
+        }
+        break;
+      default:
+        {
+          print(
+              "统计回放播放时长 event:${event.pipFlutterPlayerEventType.name} ${event.parameters}");
+        }
+        break;
+
+      /*case PipFlutterPlayerEventType.initialized:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.seekTo:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.openFullscreen:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.hideFullscreen:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.setVolume:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.controlsVisible:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.controlsHiddenStart:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.controlsHiddenEnd:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.setSpeed:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.changedSubtitles:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.changedTrack:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.changedPlayerVisibility:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.changedResolution:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.setupDataSource:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.bufferingStart:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.bufferingUpdate:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.bufferingEnd:
+        // TODO: Handle this case.
+        break;
+      case PipFlutterPlayerEventType.changedPlaylistItem:
+        // TODO: Handle this case.
+        break;*/
+    }
   }
 
   @override
@@ -174,10 +277,10 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
                             borderRadius: BorderRadius.circular(12.0)),
                         child: const Center(
                             child: Text(
-                              "Show PiP",
-                              style: TextStyle(
-                                  color: Colors.white, fontWeight: FontWeight.bold),
-                            ))),
+                          "Show PiP",
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ))),
                     onTap: () {
                       pipFlutterPlayerController
                           .enablePictureInPicture(pipFlutterPlayerKey);
@@ -193,10 +296,10 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
                             borderRadius: BorderRadius.circular(12.0)),
                         child: const Center(
                             child: Text(
-                              "Disable PiP",
-                              style: TextStyle(
-                                  color: Colors.white, fontWeight: FontWeight.bold),
-                            ))),
+                          "Disable PiP",
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ))),
                     onTap: () async {
                       pipFlutterPlayerController.disablePictureInPicture();
                     },

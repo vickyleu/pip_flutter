@@ -367,7 +367,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
       }
       final String? eventType = map["event"] as String?;
       final String? key = map["key"] as String?;
-      print("统计回放播放时长 videoEventsFor ${eventType}");
+      // print("统计回放播放时长 videoEventsFor ${eventType}");
 
       switch (eventType) {
         case 'initialized':

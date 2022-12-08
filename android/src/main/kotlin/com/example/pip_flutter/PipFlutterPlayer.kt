@@ -16,9 +16,7 @@ import android.os.Looper
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
-import android.util.AttributeSet
 import android.util.Log
-import android.util.Xml
 import android.view.Surface
 import androidx.lifecycle.Observer
 import androidx.media.session.MediaButtonReceiver
@@ -31,6 +29,7 @@ import com.example.pip_flutter.DataSourceUtils.getUserAgent
 import com.example.pip_flutter.DataSourceUtils.isHTTP
 import com.google.android.exoplayer2.*
 import com.google.android.exoplayer2.C.TRACK_TYPE_AUDIO
+import com.google.android.exoplayer2.Player.STATE_BUFFERING
 import com.google.android.exoplayer2.audio.AudioAttributes
 import com.google.android.exoplayer2.drm.*
 import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
@@ -48,8 +47,6 @@ import com.google.android.exoplayer2.trackselection.TrackSelectionOverride
 import com.google.android.exoplayer2.ui.PlayerNotificationManager
 import com.google.android.exoplayer2.ui.PlayerNotificationManager.BitmapCallback
 import com.google.android.exoplayer2.ui.PlayerNotificationManager.MediaDescriptionAdapter
-import com.google.android.exoplayer2.ui.StyledPlayerControlView
-import com.google.android.exoplayer2.ui.StyledPlayerView
 import com.google.android.exoplayer2.upstream.DataSource
 import com.google.android.exoplayer2.upstream.DefaultDataSource
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
@@ -58,7 +55,6 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.EventChannel.EventSink
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.view.TextureRegistry.SurfaceTextureEntry
-import org.xmlpull.v1.XmlPullParser
 import java.io.File
 import java.util.*
 import kotlin.math.max
@@ -73,7 +69,8 @@ internal class PipFlutterPlayer(
     result: MethodChannel.Result
 ) {
     private val exoPlayer: ExoPlayer?
-    private val eventSink = QueuingEventSink()
+    private var onStopCallback: (()->Unit)? = null
+    internal val eventSink = QueuingEventSink()
     private val trackSelector: DefaultTrackSelector = DefaultTrackSelector(context)
     private val loadControl: LoadControl
     private var isInitialized = false
@@ -368,8 +365,8 @@ internal class PipFlutterPlayer(
         val forwardingPlayer = object : ForwardingPlayer(player) {
             override fun isCommandAvailable(command: Int): Boolean {
                 if (
-                    command == COMMAND_SET_SHUFFLE_MODE||
-                    command == COMMAND_SET_REPEAT_MODE||
+                    command == COMMAND_SET_SHUFFLE_MODE ||
+                    command == COMMAND_SET_REPEAT_MODE ||
                     command == COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM
                 ) {
                     return false;
@@ -390,12 +387,12 @@ internal class PipFlutterPlayer(
             addListener(object : Player.Listener {
                 override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                     super.onPlayWhenReadyChanged(playWhenReady, reason)
-                   /* ///TODO 视频流准备好时自动触发暂停和播放,看不懂是什么鬼操作
-                    if (playWhenReady) {
-                        sendEvent("pause")
-                    } else {
-                        sendEvent("play")
-                    }*/
+                    /* ///TODO 视频流准备好时自动触发暂停和播放,看不懂是什么鬼操作
+                     if (playWhenReady) {
+                         sendEvent("pause")
+                     } else {
+                         sendEvent("play")
+                     }*/
                 }
 
                 override fun onSeekBackIncrementChanged(seekBackIncrementMs: Long) {
@@ -416,12 +413,12 @@ internal class PipFlutterPlayer(
 
                 override fun onEvents(player: Player, events: Player.Events) {
                     super.onEvents(player, events)
-                    Log.wtf("${this@PipFlutterPlayer.javaClass}","onEvents:$events")
+                    Log.wtf("${this@PipFlutterPlayer.javaClass}", "onEvents:$events")
                 }
 
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     super.onIsPlayingChanged(isPlaying)
-                    Log.wtf("${this@PipFlutterPlayer.javaClass}","onIsPlayingChanged:$isPlaying")
+                    Log.wtf("${this@PipFlutterPlayer.javaClass}", "onIsPlayingChanged:$isPlaying")
                 }
 
             })
@@ -645,6 +642,7 @@ internal class PipFlutterPlayer(
                         event["event"] = "completed"
                         event["key"] = key
                         eventSink.success(event)
+                        onStopCallback?.invoke()
                     }
                     Player.STATE_IDLE -> {
                         //no-op
@@ -654,6 +652,7 @@ internal class PipFlutterPlayer(
 
             override fun onPlayerError(error: PlaybackException) {
                 eventSink.error("VideoError", "Video player had error $error", "")
+                onStopCallback?.invoke()
             }
         })
         val reply: MutableMap<String, Any> = HashMap()
@@ -689,6 +688,11 @@ internal class PipFlutterPlayer(
         }
     }
 
+    fun playFromStart() {
+        exoPlayer?.seekTo(0)
+        exoPlayer?.playWhenReady = true
+    }
+
     fun play() {
         exoPlayer?.playWhenReady = true
     }
@@ -698,7 +702,11 @@ internal class PipFlutterPlayer(
     }
 
     fun isPlaying(): Boolean {
-       return (exoPlayer?.isPlaying ?: false)// || (exoPlayer?.isLoading ?: false)
+        return (exoPlayer?.isPlaying ?: false) || (exoPlayer?.isLoading ?: false)
+    }
+    fun isBuffering(): Boolean {
+       return exoPlayer?.isLoading ?: false
+//        return exoPlayer?.playbackState == STATE_BUFFERING
     }
 
 
@@ -750,8 +758,8 @@ internal class PipFlutterPlayer(
             return exoPlayer?.currentPosition ?: 0
         }
 
-    val duration:Long
-    get() = getDuration()
+    val duration: Long
+        get() = getDuration()
 
     private fun sendInitialized() {
         if (isInitialized) {
@@ -789,7 +797,7 @@ internal class PipFlutterPlayer(
     @SuppressLint("UnspecifiedImmutableFlag")
     fun setupMediaSession(context: Context?, setupControlDispatcher: Boolean): MediaSessionCompat {
         mediaSession?.release()
-        ComponentName(context!!, MediaButtonReceiver::class.java) //val _mediaButtonReceiver =
+        val mediaButtonReceiver = ComponentName(context!!, MediaButtonReceiver::class.java)
         val mediaButtonIntent = Intent(Intent.ACTION_MEDIA_BUTTON)
         val pendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             PendingIntent.getBroadcast(
@@ -810,6 +818,17 @@ internal class PipFlutterPlayer(
                 sendSeekToEvent(pos)
                 super.onSeekTo(pos)
             }
+
+            /*override fun onPause() {
+                Log.wtf("videoEventsFor","mediaSession.setCallback pause")
+                sendEvent("pause")
+                super.onPause()
+            }
+            override fun onPlay() {
+                Log.wtf("videoEventsFor","mediaSession.setCallback play")
+                sendEvent("play")
+                super.onPlay()
+            }*/
         })
         mediaSession.isActive = true
         val mediaSessionConnector = MediaSessionConnector(mediaSession)
@@ -820,8 +839,10 @@ internal class PipFlutterPlayer(
 //        if(setupControlDispatcher){
 //            mediaSessionConnector.setPlayer(setupControlDispatcher2(exoPlayer!!))
 //        }else{
-            mediaSessionConnector.setPlayer(exoPlayer)
+        mediaSessionConnector.setPlayer(exoPlayer)
 //        }
+
+
         this.mediaSession = mediaSession
         return mediaSession
     }
@@ -832,9 +853,10 @@ internal class PipFlutterPlayer(
         isPip = inPip
         eventSink.success(event)
     }
-    private var isPip=false
+
+    private var isPip = false
     fun isPiping(): Boolean {
-        Log.wtf("fucker isPiping()","isPip:$isPip")
+        Log.wtf("fucker isPiping()", "isPip:$isPip")
         return isPip
     }
 
@@ -961,6 +983,10 @@ internal class PipFlutterPlayer(
         var result = exoPlayer?.hashCode() ?: 0
         result = 31 * result + if (surface != null) surface.hashCode() else 0
         return result
+    }
+
+    fun setOnStopListener(callback: (()->Unit)?) {
+        onStopCallback = callback
     }
 
     companion object {
