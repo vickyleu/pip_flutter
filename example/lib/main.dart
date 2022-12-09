@@ -1,10 +1,79 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:isolate';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pip_flutter/pipflutter_player.dart';
 import 'package:pip_flutter/pipflutter_player_notification_configuration.dart';
+import 'package:pip_flutter/utils/pip_flutter_timer.dart';
+import 'package:pip_flutter/utils/pip_video_record.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  String video_id = "q12131313123";
+  String user_id = "1008613";
+  String? video_record_id = "10010";
   runApp(const MyApp());
+  Future.delayed(const Duration(milliseconds: 100)).then((value) async {
+    final db = PipVideoRecordDatabase();
+    await db.init();
+    final receivePort = ReceivePort();
+    final timer = PipTimer(
+        callback: (e) {
+          e.addAll({
+            'video_id': video_id,
+            'user_id': user_id,
+            'video_record_id': video_record_id,
+          });
+          JsonEncoder encoder = const JsonEncoder.withIndent('  ');
+          print("timer:${encoder.convert(e)}");
+        },
+        markInterval: 4,
+        sendPort: receivePort.sendPort);
+    await Isolate.spawn(testIsolate, PortContainer(receivePort.sendPort));
+    receivePort.listen((data) {
+      if (data is PortContainer) {
+        final sendPort = data.port;
+        sendPort.send(timer);
+      } else if (data is PipVideoRecord) {
+        db.addRecord(data);
+      } else {
+        print("结束查询");
+        db.getUserRecords(user_id).then((events) {
+          JsonEncoder encoder = const JsonEncoder.withIndent('  ');
+          print("events===>>${events.map((e) => encoder.convert(e.toJson()))}");
+        });
+        db.getAllRecords().then((events) {
+          JsonEncoder encoder = const JsonEncoder.withIndent('  ');
+          print("events===>>${events.map((e) => encoder.convert(e.toJson()))}");
+        });
+      }
+    });
+  });
+}
+
+Future<void> testIsolate(PortContainer portContainer) async {
+  final port = portContainer.port;
+  final receivePort = ReceivePort();
+
+  port.send(PortContainer(receivePort.sendPort));
+  final pipTimer = await receivePort.first as PipTimer;
+
+  int progress = 0;
+  Future.delayed(const Duration(seconds: 4)).then((value) {
+    pipTimer.start();
+    Timer.periodic(const Duration(milliseconds: 600), (timer) {
+      progress++;
+      pipTimer.mark(progress);
+    });
+    Future.delayed(const Duration(seconds: 30)).then((value) {
+      pipTimer.pause();
+      Future.delayed(const Duration(milliseconds: 300)).then((value) {
+        Isolate.exit(port);
+      });
+    });
+  });
 }
 
 class MyApp extends StatelessWidget {

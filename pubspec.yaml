@@ -13,6 +13,7 @@ dependencies:
   wakelock: ^0.5.6
   focus_detector: ^2.0.1
   visibility_detector: ^0.2.0
+  sqflite: ^2.2.2
   xml: ^5.3.0
   pedantic: ^1.11.1
   flutter_widget_from_html_core: ^0.8.2
