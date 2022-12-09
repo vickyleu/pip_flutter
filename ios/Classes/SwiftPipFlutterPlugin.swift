@@ -13,22 +13,22 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
     private var isInPipMode: Bool = false
     private var aspect: AspectToken?
 
-    static var _sharedInstance: SwiftPipFlutterPlugin?
+    private  static var _sharedInstance: SwiftPipFlutterPlugin?
 
     private lazy var channel: FlutterMethodChannel = {
         FlutterMethodChannel.init(name: "pipflutter_player_channel", binaryMessenger: registrar.messenger())
     }()
 
-    var _dataSourceDict = Dictionary<Int, Dictionary<String, AnyObject>>()
-    var _timeObserverIdDict = Dictionary<String, AnyObject>()
-    var _artworkImageDict = Dictionary<String, MPMediaItemArtwork>()
+    private var _dataSourceDict = Dictionary<Int, Dictionary<String, AnyObject>>()
+    private var _timeObserverIdDict = Dictionary<String, AnyObject>()
+    private var _artworkImageDict = Dictionary<String, MPMediaItemArtwork>()
 
-    var texturesCount: Int = -1
+    private var texturesCount: Int = -1
 
-    var _notificationPlayer: PipFlutter?
-    var _remoteCommandsInitialized: Bool = false
+    private var _notificationPlayer: PipFlutter?
+    private var _remoteCommandsInitialized: Bool = false
 
-    var _cacheManager: PipCacheManager = PipCacheManager()
+    private var _cacheManager: PipCacheManager = PipCacheManager()
 
     class func shareInstance() -> SwiftPipFlutterPlugin {
         return _sharedInstance!
@@ -65,7 +65,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
 
     
     
-    func aaa() {
+    private  func aaa() {
         if self.aspect != nil {
             return
         }
@@ -96,7 +96,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         }
     }
 
-    func bbb() {
+    private  func bbb() {
         self.aspect?.remove()
     }
 
@@ -112,14 +112,14 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
             $0.1
         }
         let player = players.last
-        
+
         if player != nil && player!.isPlaying && player!.isPiping {
             self.channel.invokeMethod("exitPip", arguments: nil)
         }
         self.bgTask = .invalid
         self.isInPipMode = false
         print("applicationWillEnterForeground exitPip")
-        
+//
 
     }
 
@@ -322,7 +322,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                     nowPlayingInfoDict[MPMediaItemPropertyArtwork] = artworkImage
                     MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfoDict
                 } else {
-                    DispatchQueue.global(qos: .userInteractive).async {
+                    DispatchQueue.global(qos: .background).async {[weak self] in
                         do {
                             var tempArtworkImage: UIImage?
                             if !imageUrl!.contains("http") {
@@ -336,7 +336,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                                 let artworkImage = MPMediaItemArtwork.init(boundsSize: boundsSize) { size in
                                     return image
                                 }
-                                self._artworkImageDict[key] = artworkImage
+                                self?._artworkImageDict[key] = artworkImage
                                 nowPlayingInfoDict[MPMediaItemPropertyArtwork] = artworkImage
                             }
                             MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfoDict
@@ -356,6 +356,9 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
 //
     func getTextureId(_ player: PipFlutter) -> String {
         let temp = self.players.allKeysForValue(val: player)
+        if temp.count==0{
+            return "\(-1)"
+        }
         let key = temp.last!
         return "\(key)"
     }
@@ -568,9 +571,16 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 result(false)
                 break
             case "disablePictureInPicture":
-                player.disablePictureInPicture()
-                player.setPictureInPicture(pictureInPicture: false)
+                player.disablePictureInPictureNoAction()
                 result(nil)
+                DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + .milliseconds(1500), execute: {
+                    [weak player] in
+                    player?.disablePictureInPicture()
+//                    player?.mPictureInPicture = false
+                })
+//                player.mPictureInPicture = false
+                
+               
                 break
             case "setAudioTrack":
                 let name = argsMap["name"] as! String
