@@ -85,6 +85,14 @@ class _PipFlutterPlayerCupertinoControlsState
     final isFullScreen = _pipFlutterPlayerController?.isFullScreen == true;
 
     _wasLoading = isLoading(_latestValue);
+
+    final isPlaying = _controller!.value.isPlaying;
+    final isPip =_controller!.value.isPip;
+    if(isPip && !isPlaying && !isFullScreen){
+      pipFlutterPlayerController!.setControlsEnabled(true);
+      controlsNotVisible=false;
+    }
+
     final controlsColumn = Column(children: <Widget>[
       _buildTopBar(
         backgroundColor,
@@ -103,11 +111,15 @@ class _PipFlutterPlayerCupertinoControlsState
         barHeight,
       ),
     ]);
+
+
     return GestureDetector(
       onTap: () {
         if (PipFlutterPlayerMultipleGestureDetector.of(context) != null) {
           PipFlutterPlayerMultipleGestureDetector.of(context)!.onTap?.call();
         }
+
+        print("cancelAndRestartTimer === >>> ${controlsNotVisible}");
         controlsNotVisible
             ? cancelAndRestartTimer()
             : changePlayerControlsNotVisible(true);
@@ -586,6 +598,7 @@ class _PipFlutterPlayerCupertinoControlsState
 
   @override
   void cancelAndRestartTimer() {
+    print("cancelAndRestartTimer 1");
     _hideTimer?.cancel();
     changePlayerControlsNotVisible(false);
     _startHideTimer();

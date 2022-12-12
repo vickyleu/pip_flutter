@@ -71,6 +71,8 @@ class _PipFlutterPlayerMaterialControlsState
         child: _buildErrorWidget(),
       );
     }
+
+
     return GestureDetector(
       onTap: () {
         if (PipFlutterPlayerMultipleGestureDetector.of(context) != null) {

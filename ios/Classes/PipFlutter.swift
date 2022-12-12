@@ -379,12 +379,21 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             if #available(iOS 10.0, *) {
                 if self.pipController?.isPictureInPictureActive == true {
                     if self.lastAvPlayerTimeControlStatus != nil && self.lastAvPlayerTimeControlStatus == self.player.timeControlStatus {
+                        if self.player.timeControlStatus == .paused {
+                            self.isPlaying=false
+                            self.eventSink?(["event" : "pause"])
+                            return
+                        }
+                        if self.player.timeControlStatus == .playing {
+                            self.isPlaying = true
+                            self.eventSink?(["event" : "play"])
+                        }
                         return
                     }
 
                     if self.player.timeControlStatus == .paused {
                         self.lastAvPlayerTimeControlStatus = self.player.timeControlStatus
-                        
+                            self.isPlaying=false
                             self.eventSink?(["event" : "pause"])
                 
                         return
@@ -392,7 +401,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
                     }
                     if self.player.timeControlStatus == .playing {
                         self.lastAvPlayerTimeControlStatus = self.player.timeControlStatus
-                     
+                            self.isPlaying = true
                             self.eventSink?(["event" : "play"])
                        
                     }
@@ -766,7 +775,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
 
     public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
         //画中画播放器启动失败
-        print("failedToStartPictureInPictureWithError")
+        print("failedToStartPictureInPictureWithError:: \(error)")
     }
 
     public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {

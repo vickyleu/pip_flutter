@@ -3,9 +3,7 @@ import 'dart:convert';
 import 'dart:isolate';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pip_flutter/pipflutter_player.dart';
-import 'package:pip_flutter/pipflutter_player_notification_configuration.dart';
 import 'package:pip_flutter/utils/pip_flutter_timer.dart';
 import 'package:pip_flutter/utils/pip_video_record.dart';
 
@@ -138,6 +136,8 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 
 class PictureInPicturePage extends StatefulWidget {
+  const PictureInPicturePage({Key? key}) : super(key: key);
+
   @override
   _PictureInPicturePageState createState() => _PictureInPicturePageState();
 }
@@ -382,5 +382,13 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    print("disposedisposedisposedispose");
+    pipFlutterPlayerKey.currentState?.dispose();
+    pipFlutterPlayerController.dispose();
+    super.dispose();
   }
 }

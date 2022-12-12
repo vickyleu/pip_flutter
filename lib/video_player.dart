@@ -244,10 +244,15 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           break;
 
         case VideoEventType.play:
-          play(); //TODO check this !!!!
+          value = value.copyWith(isPlaying: true);
+          // play(); //TODO check this !!!!
+          // setControlsEnabled(false);
           break;
         case VideoEventType.pause:
-          pause(); //TODO check this !!!!
+          print("VideoEventType.pause TODO check this !!!!");
+          value = value.copyWith(isPlaying: false);
+          // pause(); //TODO check this !!!!
+          // setControlsEnabled(true);
           break;
         case VideoEventType.seek:
           seekTo(event.position);
@@ -291,6 +296,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         .setPipInBackgroundCallback(pipInBackgroundCallback);
   }
 
+
   /// Set data source for playing a video from an asset.
   ///
   /// The name of the asset is given by the [dataSource] argument and must not be
@@ -325,7 +331,6 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
   @override
   void notifyListeners() {
-    print("${this.runtimeType} 统计回放播放时长 notifyListeners::${StackTrace.current}");
     super.notifyListeners();
   }
 
@@ -674,6 +679,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   static Future stopPreCache(String url, String? cacheKey) async {
     return _videoPlayerPlatform.stopPreCache(url, cacheKey);
   }
+
 }
 
 /// Widget that displays the video controlled by [controller].

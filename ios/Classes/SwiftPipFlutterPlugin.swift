@@ -333,9 +333,10 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                             if tempArtworkImage != nil {
                                 let image = tempArtworkImage!
                                 let boundsSize = CGSize(width: image.size.width, height: image.size.height)
-                                let artworkImage = MPMediaItemArtwork.init(boundsSize: boundsSize) { size in
-                                    return image
-                                }
+                                let artworkImage = MPMediaItemArtwork(image: image)
+//                                let artworkImage = MPMediaItemArtwork.init(boundsSize: boundsSize) { size in
+//                                    return image
+//                                }
                                 self?._artworkImageDict[key] = artworkImage
                                 nowPlayingInfoDict[MPMediaItemPropertyArtwork] = artworkImage
                             }
@@ -573,11 +574,16 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
             case "disablePictureInPicture":
                 player.disablePictureInPictureNoAction()
                 result(nil)
-                DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + .milliseconds(1500), execute: {
+                DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(1500)) {
                     [weak player] in
                     player?.disablePictureInPicture()
-//                    player?.mPictureInPicture = false
-                })
+                }
+//                DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + .milliseconds(1500), execute: {
+////                DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + .milliseconds(1500), execute: {
+//                    [weak player] in
+//                    player?.disablePictureInPicture()
+////                    player?.mPictureInPicture = false
+//                })
 //                player.mPictureInPicture = false
                 
                
