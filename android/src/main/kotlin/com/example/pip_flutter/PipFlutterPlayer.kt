@@ -702,7 +702,8 @@ internal class PipFlutterPlayer(
     }
 
     fun isPlaying(): Boolean {
-        return (exoPlayer?.isPlaying ?: false) || (exoPlayer?.isLoading ?: false)
+        return   (exoPlayer?.isPlaying ?: false)
+                || (exoPlayer?.isLoading ?: false)
     }
     fun isBuffering(): Boolean {
        return exoPlayer?.isLoading ?: false

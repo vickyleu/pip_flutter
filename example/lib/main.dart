@@ -173,7 +173,7 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
             .enablePictureInPictureFrame(pipFlutterPlayerKey);
       }
     }, pipInBackgroundCallback: (position, duration) {
-      print("PictureInPicture === >>position=>$position duration=>$duration");
+      // print("PictureInPicture === >>position=>$position duration=>$duration");
     });
     pipFlutterPlayerController.setupDataSource(PipFlutterPlayerDataSource(
         PipFlutterPlayerDataSourceType.network,
@@ -325,12 +325,15 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
             Flexible(
               flex: 1,
               fit: FlexFit.loose,
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: PipFlutterPlayer(
-                  controller: pipFlutterPlayerController,
-                  key: pipFlutterPlayerKey,
+              child: Container(
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: PipFlutterPlayer(
+                    controller: pipFlutterPlayerController,
+                    key: pipFlutterPlayerKey,
+                  ),
                 ),
+                color: Colors.red,
               ),
             ),
             Container(

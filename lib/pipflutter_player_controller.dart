@@ -808,7 +808,7 @@ class PipFlutterPlayerController {
 
   ///Listener used to handle video player changes.
   void _onVideoPlayerChanged() async {
-    print("统计回放播放时长 _onVideoPlayerChanged ");
+    // print("统计回放播放时长 _onVideoPlayerChanged ");
     final VideoPlayerValue currentVideoPlayerValue =
         videoPlayerController?.value ??
             VideoPlayerValue(duration: const Duration());
@@ -1121,12 +1121,13 @@ class PipFlutterPlayerController {
       setControlsEnabled(false);
       if (Platform.isAndroid) {
         _wasInFullScreenBeforePiP = _isFullScreen;
-        if(!_isFullScreen){
-          enterFullScreen();
-        }
+
         await videoPlayerController?.enablePictureInPicture(
             left: 0, top: 0, width: 0, height: 0);
         _postEvent(PipFlutterPlayerEvent(PipFlutterPlayerEventType.pipStart));
+        if(!_isFullScreen){
+          enterFullScreen();
+        }
         return;
       }
       else if (Platform.isIOS) {
@@ -1200,6 +1201,11 @@ class PipFlutterPlayerController {
   Future<void>? disablePictureInPicture() {
     if (videoPlayerController == null) {
       throw StateError("The data source has not been initialized");
+    }
+    if(Platform.isAndroid){
+      if(!_wasInFullScreenBeforePiP){
+        exitFullScreen();
+      }
     }
     videoPlayerController!.refresh();
     return videoPlayerController!.disablePictureInPicture();

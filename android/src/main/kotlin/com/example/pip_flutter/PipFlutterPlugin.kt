@@ -181,22 +181,31 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
         if (videoPlayers.size() != 1) return
         if (activity != this.activity || !isPictureInPictureSupported()) return
         val player = videoPlayers.valueAt(0)
-        if ((player.isPlaying() || player.isBuffering()) && !player.isPiping()) {
+        if ((player.isPlaying()
+                    || player.isBuffering()
+                    )
+            && !player.isPiping()) {
             Log.e(TAG, "onActivityPaused")
             flutterState!!.invokeMethod("prepareToPip")
         }
         super.onActivityPrePaused(activity)
     }
 
-
-    override fun onActivityResumed(activity: Activity) {
+    override fun onActivityPreResumed(activity: Activity) {
         if (videoPlayers.size() != 1) return
         if (activity != this.activity || !isPictureInPictureSupported()) return
         if (activity.isInPictureInPictureMode) return
         val player = videoPlayers.valueAt(0)
-        if ((player.isPlaying() || player.isBuffering()) && player.isPiping()) {
+        if ((player.isPlaying()
+                    || player.isBuffering()
+                    ) && player.isPiping()) {
             flutterState!!.invokeMethod("exitPip")
         }
+        super.onActivityPreResumed(activity)
+    }
+
+    override fun onActivityResumed(activity: Activity) {
+
     }
 
     /**

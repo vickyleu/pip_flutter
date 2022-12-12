@@ -534,10 +534,6 @@ abstract class PipFlutterPlayerControlsState<T extends StatefulWidget>
 
   ///Called when player controls visibility should be changed.
   void changePlayerControlsNotVisible(bool notVisible) {
-    if(!notVisible){
-      print("cancelAndRestartTimer  2---pre ${mounted} ${StackTrace.current}");
-    }
-    print("cancelAndRestartTimer  2 ${mounted} ${StackTrace.current}");
     if(mounted){
       setState(() {
         if (notVisible) {
