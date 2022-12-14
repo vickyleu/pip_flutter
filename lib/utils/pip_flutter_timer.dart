@@ -17,35 +17,48 @@ class PipTimer {
   final int markInterval;
   final SendPort? sendPort;
 
-  PipTimer({required this.callback, this.markInterval = 30, this.sendPort});
-
-  final StreamController<Map<String, dynamic>> _controller =
-      StreamController<Map<String, dynamic>>();
-  StreamSubscription? _subscription;
-  Timer? _countingTimer;
-
-  int _timeInterval=0;
-  int _markTempTimeInterval=0;
-  // 开始计时
-  void start() {
-    if (_eventName != TimerState.idle && _eventName != TimerState.pause) return;
-    _eventName = TimerState.start;
-    _eventTime = DateTime.now();
-    _subscription = onEventChanged.listen((event) {
+  PipTimer({required this.callback, this.markInterval = 30, this.sendPort}){
+    _controller.stream..listen((event) {
+      print("接收回调事件:::: onEventChanged timer start");
       callback.call(event);
       try {
         sendPort?.send(PipVideoRecord.fromJson(event));
       } catch (e) {
-        print("eee===>$e");
+        print("eee===>$e  ${StackTrace.current}");
       }
     });
+  }
+
+  final StreamController<Map<String, dynamic>> _controller =
+      StreamController<Map<String, dynamic>>();
+
+
+  Timer? _countingTimer;
+
+  int _timeInterval=0;
+  int _markTempTimeInterval=0;
+  
+  // 开始计时
+  void start({int? progress=null}) {
+    print("timer start");
+    if (_eventName != TimerState.idle && _eventName != TimerState.pause) {
+      print("接收回调事件::::  timer start");
+      return;
+    }
+    _eventName = TimerState.start;
+    _eventTime = DateTime.now();
+
     _timeInterval=0;
     _markTempTimeInterval=0;
     _countingTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       // Do something here
       _timeInterval++;
     });
+    print("接收回调事件:::: onEventChanged timer add");
 
+    if(progress!=null){
+      _eventProgress = progress!;
+    }
     _controller.add({
       'event_name': _eventName.name,
       'event_interval': 0,
@@ -54,8 +67,10 @@ class PipTimer {
     });
   }
 
+
   // 暂停计时
   void pause() {
+    print("timer pause");
     if (_eventName == TimerState.pause || _eventName == TimerState.idle) return;
     _eventName = TimerState.pause;
     _eventTime = DateTime.now();
@@ -74,17 +89,16 @@ class PipTimer {
       'event_time': _eventTime.toString().substring(0, 19),
       'event_progress': _eventProgress
     });
-    Future.delayed(const Duration(milliseconds: 200)).then((value) {
-      _subscription?.cancel();
-      _subscription = null;
-    });
+
   }
 
   // 打点  // 进度
-  void mark(int currentProgress) {
+  void mark(int currentProgress,{bool force=false}) {
     _eventProgress = currentProgress;
     if (_eventName == TimerState.idle || _eventName == TimerState.pause) return;
-    if (DateTime.now().difference(_eventTime).inSeconds < markInterval) return;
+    if(!force){
+      if (DateTime.now().difference(_eventTime).inSeconds < markInterval) return;
+    }
     _eventName = TimerState.mark;
     _eventTime = DateTime.now();
     final oldInterval = _markTempTimeInterval;
@@ -99,8 +113,6 @@ class PipTimer {
     });
   }
 
-  // 回调
-  Stream<Map<String, dynamic>> get onEventChanged => _controller.stream;
 }
 
 class PortContainer {

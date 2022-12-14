@@ -172,7 +172,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         }
     }
 
-   @objc func itemDidPlayToEndTime(notification:NSNotification) {
+   @objc func itemDidPlayToEndTime(_ notification:NSNotification) {
         if self.isLooping {
             let p = notification.object as! AVPlayerItem
             p.seek(to: CMTime.zero, completionHandler:nil)
@@ -429,7 +429,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         if context != nil{
             if(context! == timeRangeContext && object is AVPlayerItem){
                 if self.eventSink != nil {
-                    var values = [Int64]()
+                    var values = [[Int64]]()
                     (object as! AVPlayerItem).loadedTimeRanges.forEach { rangeValue in
                         let range = rangeValue.timeRangeValue
                         let start = PipFlutterTimeUtils.timeToMillis(range.start)
@@ -440,9 +440,9 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
                                 end = endTime
                             }
                         }
-                        values.append(contentsOf: [start,end])
+                        values.append([start,end])
                     }
-                    self.eventSink!(["event" : "bufferingUpdate", "values" : values, "key" : self.key])
+                    self.eventSink!(["event" : "bufferingUpdate", "values" : values, "key" : self.key as Any])
                 }
             } else if context! == presentationSizeContext {
                 self.onReadyToPlay()
@@ -657,7 +657,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
 
     func setPictureInPicture(pictureInPicture:Bool) {
         self.mPictureInPicture = pictureInPicture
-      
+       print("setPictureInPicture pictureInPicture : \(pictureInPicture)")
         if #available(iOS 9.0, *) {
             if (self.pipController != nil) && self.mPictureInPicture && !self.pipController!.isPictureInPictureActive {
                
@@ -703,6 +703,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
 
 
     func playerLayerSetup(frame:CGRect) {
+        print("setPictureInPicture pictureInPicture : playerLayerSetup\(frame)")
 //        self.setPictureInPicture(pictureInPicture: false)
         self.mPictureInPicture = false
         if (self.playerLayer != nil) {
@@ -725,6 +726,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
 
 
     func usePlayerLayer(frame:CGRect) {
+    print("setPictureInPicture pictureInPicture : usePlayerLayer\(frame) \(self.playerLayer)")
         if (self.playerLayer == nil) {
             return
         }
@@ -831,6 +833,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         self.pause()
         self.disposeSansEventChannel()
         self.eventChannel?.setStreamHandler(nil)
+       
         self.disablePictureInPicture()
         self.mPictureInPicture = false
         self.disposed = true

@@ -73,7 +73,19 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
             // 拿到需要插入执行的 block
             let wrappedBlock: @convention(block) (AspectInfo) -> Void = { (info:AspectInfo) in
                 if !self.isInPipMode{
-                    guard let controller:FlutterViewController  = UIApplication.shared.keyWindow?.rootViewController as? FlutterViewController else {return}
+                    var flutterController : FlutterViewController? = nil
+                    let rootVc = UIApplication.shared.keyWindow?.rootViewController
+                    if let navigationVc = rootVc as? UINavigationController {
+                        if let vc = navigationVc.children.first as? FlutterViewController{
+                            flutterController = vc
+                        }
+                    }
+                    if flutterController == nil{
+                        guard let controller:FlutterViewController  = rootVc as? FlutterViewController else {return}
+                        flutterController = controller
+                    }
+                    guard let controller:FlutterViewController = flutterController as? FlutterViewController else {return}
+
                     if self.players.count != 1{
                         return
                     }
@@ -494,7 +506,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 // TODO(cyanglaz): Remove this dispatch block when
                 // https://github.com/flutter/flutter/commit/8159a9906095efc9af8b223f5e232cb63542ad0b is in
                 // stable And update the min flutter version of the plugin to the stable version.
-                DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1), execute:
+                DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(600), execute:
                 {
                     if !player.disposed{
                         player.dispose()

@@ -647,9 +647,11 @@ class _PipFlutterPlayerCupertinoControlsState
           _controller,
           _pipFlutterPlayerController,
           onDragStart: () {
+            _pipFlutterPlayerController?.setDrag(true);
             _hideTimer?.cancel();
           },
           onDragEnd: () {
+            _pipFlutterPlayerController?.setDrag(false);
             _startHideTimer();
           },
           onTapDown: () {

@@ -1,15 +1,19 @@
+import 'dart:convert';
+
 import 'package:sqflite/sqflite.dart';
 
 class PipVideoRecord {
+  final int id;
   final String eventName;
+  final int eventInterval;
   final String eventTime;
   final int eventProgress;
-  final int eventInterval;
   final String videoId;
   final String userId;
   final String? videoRecordId;
 
   PipVideoRecord({
+    this.id = 0,
     required this.eventName,
     required this.eventTime,
     required this.eventProgress,
@@ -21,6 +25,7 @@ class PipVideoRecord {
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'event_name': eventName,
       'event_time': eventTime,
       'event_progress': eventProgress,
@@ -32,7 +37,10 @@ class PipVideoRecord {
   }
 
   static PipVideoRecord fromJson(Map<String, dynamic> json) {
+    JsonEncoder encoder = const JsonEncoder.withIndent('  ');
+    print("PipVideoRecord fromJson:${encoder.convert(json)}");
     return PipVideoRecord(
+      id: json.containsKey('id') ? json['id']:0,
       eventName: json['event_name'],
       eventTime: json['event_time'],
       eventProgress: json['event_progress'],
@@ -42,6 +50,13 @@ class PipVideoRecord {
       videoRecordId: json['video_record_id'],
     );
   }
+
+  @override
+  String toString() {
+    return 'PipVideoRecord{id: $id, eventName: $eventName, eventInterval: $eventInterval, eventTime: $eventTime, eventProgress: $eventProgress, videoId: $videoId, userId: $userId, videoRecordId: $videoRecordId}';
+  }
+
+
 }
 
 class PipVideoRecordDatabase {
@@ -49,25 +64,28 @@ class PipVideoRecordDatabase {
 
 // 初始化数据库
   Future<void> init() async {
-    _database = await openDatabase(
-      'video_record.db',
-      version: 3,
-      onCreate: (Database db, int version) async {
+    _database = await openDatabase('video_record.db', version: 4,
+        onCreate: (Database db, int version) async {
+      await db.execute(
+        'CREATE TABLE records (id INTEGER PRIMARY KEY AUTOINCREMENT, event_name TEXT, event_time TEXT, event_progress INTEGER,event_interval INTEGER, video_id TEXT, user_id TEXT, video_record_id TEXT)',
+      );
+    }, onUpgrade: (Database db, int oldVersion, int newVersion) async {
+      if (newVersion > oldVersion) {
         await db.execute(
-          'CREATE TABLE records (event_name TEXT, event_time TEXT, event_progress INTEGER,event_interval INTEGER, video_id TEXT, user_id TEXT, video_record_id TEXT)',
+          'drop TABLE records',
         );
-      },
-      onUpgrade: (Database db, int oldVersion, int newVersion)async{
-        if(newVersion>oldVersion){
-          await db.execute(
-            'drop TABLE records',
-          );
-          await db.execute(
-            'CREATE TABLE records (event_name TEXT, event_time TEXT, event_progress INTEGER,event_interval INTEGER,  video_id TEXT, user_id TEXT, video_record_id TEXT)',
-          );
-        }
+        await db.execute(
+          'CREATE TABLE records (id INTEGER PRIMARY KEY AUTOINCREMENT, event_name TEXT, event_time TEXT, event_progress INTEGER,event_interval INTEGER,  video_id TEXT, user_id TEXT, video_record_id TEXT)',
+        );
       }
-    );
+    });
+  }
+
+// 删除记录
+  void removeRecords(List<PipVideoRecord> records) async {
+    await _database.delete('records',
+        where: 'id IN (${records.map((e) => '?').join(', ')})',
+        whereArgs: records.map((record) => record.id).toList());
   }
 
 // 添加记录
@@ -109,11 +127,10 @@ class PipVideoRecordDatabase {
       (i) => PipVideoRecord.fromJson(maps[i]),
     );
   }
+
   // 获取所有操作
   Future<List<PipVideoRecord>> getAllRecords() async {
-    final List<Map<String, dynamic>> maps = await _database.query(
-      'records'
-    );
+    final List<Map<String, dynamic>> maps = await _database.query('records');
     return List.generate(
       maps.length,
       (i) => PipVideoRecord.fromJson(maps[i]),

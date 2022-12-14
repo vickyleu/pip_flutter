@@ -4,8 +4,6 @@ import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:pip_flutter/pipflutter_player.dart';
-import 'package:pip_flutter/utils/pip_flutter_timer.dart';
-import 'package:pip_flutter/utils/pip_video_record.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -195,8 +193,8 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
   }
 
   void getPlayerEvent(PipFlutterPlayerEvent event) {
-    print(
-        "统计回放播放时长 event:${event.pipFlutterPlayerEventType.name} ${event.parameters}");
+    // print(
+    //     "统计回放播放时长 event:${event.pipFlutterPlayerEventType.name} ${event.parameters}");
     switch (event.pipFlutterPlayerEventType) {
       case PipFlutterPlayerEventType.progress:
         {

@@ -31,6 +31,7 @@ import 'package:pip_flutter/video_player_platform_interface.dart';
 ///Class used to control overall PipFlutter Player behavior. Main class to change
 ///state of PipFlutter Player.
 class PipFlutterPlayerController {
+  static const String _dragParameter = "drag";
   static const String _durationParameter = "duration";
   static const String _progressParameter = "progress";
   static const String _bufferedParameter = "buffered";
@@ -72,9 +73,13 @@ class PipFlutterPlayerController {
   bool _isFullScreen = false;
   bool _isPiping = false;
 
+  bool _isDragging = false;
+
   ///Flag used to store full screen mode state.
   bool get isFullScreen => _isFullScreen;
   bool get isPiping => _isPiping;
+
+  bool get isDragging => _isDragging;
 
   ///Time when last progress event was sent
   int _lastPositionSelection = 0;
@@ -1121,13 +1126,13 @@ class PipFlutterPlayerController {
       setControlsEnabled(false);
       if (Platform.isAndroid) {
         _wasInFullScreenBeforePiP = _isFullScreen;
-
-        await videoPlayerController?.enablePictureInPicture(
-            left: 0, top: 0, width: 0, height: 0);
-        _postEvent(PipFlutterPlayerEvent(PipFlutterPlayerEventType.pipStart));
         if(!_isFullScreen){
           enterFullScreen();
         }
+        await videoPlayerController?.enablePictureInPicture(
+            left: 0, top: 0, width: 0, height: 0);
+        _postEvent(PipFlutterPlayerEvent(PipFlutterPlayerEventType.pipStart));
+
         return;
       }
       else if (Platform.isIOS) {
@@ -1403,5 +1408,11 @@ class PipFlutterPlayerController {
       ///Delete files async
       _tempFiles.forEach((file) => file.delete());
     }
+  }
+
+  void setDrag(bool drag) {
+    _isDragging = drag;
+    _postEvent(PipFlutterPlayerEvent(PipFlutterPlayerEventType.isDragging,
+        parameters: <String, dynamic>{_dragParameter: drag}));
   }
 }

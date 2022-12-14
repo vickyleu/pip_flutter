@@ -4,6 +4,7 @@ enum PipFlutterPlayerEventType {
   play,
   pause,
   seekTo,
+  isDragging,
   openFullscreen,
   hideFullscreen,
   setVolume,
