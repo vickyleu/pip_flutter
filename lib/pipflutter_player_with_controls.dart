@@ -79,6 +79,7 @@ class _PipFlutterPlayerWithControlsState
     PipFlutterPlayerController.of(context);
 
     double? aspectRatio;
+
     if (pipFlutterPlayerController.isFullScreen) {
       if (pipFlutterPlayerController.pipFlutterPlayerConfiguration
           .autoDetectFullscreenDeviceOrientation ||

@@ -641,6 +641,7 @@ class PipFlutterPlayerController {
 
   ///Enables full screen mode in player. This will trigger route change.
   void enterFullScreen() {
+    print("enterFullScreen called");
     _isFullScreen = true;
     _postControllerEvent(PipFlutterPlayerControllerEvent.openFullscreen);
   }
@@ -841,8 +842,15 @@ class PipFlutterPlayerController {
     else if (_wasInPipMode) {
       _postEvent(PipFlutterPlayerEvent(PipFlutterPlayerEventType.pipStop));
       _wasInPipMode = false;
-      if (!_wasInFullScreenBeforePiP) {
-        exitFullScreen();
+      print("_wasInFullScreenBeforePiP exitFullScreen ${_wasInFullScreenBeforePiP}");
+      if(Platform.isAndroid){
+        if (!_wasInFullScreenBeforePiP) {
+          exitFullScreen();
+        }
+      }else {
+        if (_wasInFullScreenBeforePiP) {
+          exitFullScreen();
+        }
       }
       if (_wasControlsEnabledBeforePiP) {
         setControlsEnabled(true);

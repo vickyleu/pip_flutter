@@ -198,6 +198,7 @@ class _PipFlutterPlayerState extends State<PipFlutterPlayer>
       resizeToAvoidBottomInset: false,
       body: Container(
         alignment: Alignment.center,
+        // color: Colors.red,
         color: Colors.black,
         child: controllerProvider,
       ),
@@ -248,6 +249,7 @@ class _PipFlutterPlayerState extends State<PipFlutterPlayer>
       final aspectRatio =
           widget.controller.videoPlayerController?.value.aspectRatio ?? 1.0;
       List<DeviceOrientation> deviceOrientations;
+      print("enterFullScreen called _pushFullScreenWidget ${aspectRatio}");
       if (aspectRatio < 1.0) {
         deviceOrientations = [
           DeviceOrientation.portraitUp,
@@ -261,6 +263,8 @@ class _PipFlutterPlayerState extends State<PipFlutterPlayer>
       }
       await SystemChrome.setPreferredOrientations(deviceOrientations);
     } else {
+      print("enterFullScreen called _pushFullScreenWidget  ${widget.controller.pipFlutterPlayerConfiguration
+          .deviceOrientationsOnFullScreen}");
       await SystemChrome.setPreferredOrientations(
         widget.controller.pipFlutterPlayerConfiguration
             .deviceOrientationsOnFullScreen,
