@@ -66,7 +66,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
 
     
     
-    private  func aaa() {
+    private  func initAspect() {
         if self.aspect != nil {
             return
         }
@@ -95,6 +95,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                     }
                     let players = self.players.map{$0.1}
                     guard let player:PipFlutter  = players.last else {return}
+                    print("preparePipFrame::::::isPlaying::>>>\(player.isPlaying)   isPiping::>>>\(player.isPiping)")
                     if player.isPlaying && !player.isPiping {
                         self.channel.invokeMethod("preparePipFrame", arguments: nil)
                         self.isInPipMode = true
@@ -109,8 +110,10 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         }
     }
 
-    private  func bbb() {
+    private  func disposeAspect() {
         self.aspect?.remove()
+        self.aspect = nil
+        self.isInPipMode = false
     }
 
 
@@ -492,7 +495,8 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 result(nil)
                 break
             case "dispose":
-                self.bbb()
+                self.disposeAspect()
+                player.disablePictureInPicture()
                 player.clear()
                 self.disposeNotificationData(player: player)
                 self.setRemoteCommandsNotificationNotActive()
@@ -533,7 +537,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
             case "play":
                 self.setupRemoteNotification(player)
                 player.play()
-                self.aaa()
+                self.initAspect()
                 result(nil)
                 break
             case "position":

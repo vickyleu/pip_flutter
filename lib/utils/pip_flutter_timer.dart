@@ -19,7 +19,7 @@ class PipTimer {
 
   PipTimer({required this.callback, this.markInterval = 30, this.sendPort}){
     _controller.stream..listen((event) {
-      print("接收回调事件:::: onEventChanged timer start");
+      // print("接收回调事件:::: onEventChanged timer start");
       callback.call(event);
       try {
         sendPort?.send(PipVideoRecord.fromJson(event));
@@ -94,7 +94,6 @@ class PipTimer {
 
   // 打点  // 进度
   void mark(int currentProgress,{bool force=false}) {
-    print("markmarkmarkmark====>>${force}  ${StackTrace.current}");
     _eventProgress = currentProgress;
     if (_eventName == TimerState.idle || _eventName == TimerState.pause) return;
     if(!force){
@@ -139,7 +138,7 @@ void main() {
             'user_id': user_id,
             'video_record_id': video_record_id,
           });
-          print("timer:$e");
+          // print("timer:$e");
         },
         markInterval: 4,
         sendPort: receivePort.sendPort);
