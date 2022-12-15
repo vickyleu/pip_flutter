@@ -80,7 +80,7 @@ class _PipFlutterPlayerMaterialControlsState
         }
         controlsNotVisible
             ? cancelAndRestartTimer()
-            : changePlayerControlsNotVisible(true);
+            : changePlayerControlsNotVisible(true,10);
       },
       onDoubleTap: () {
         if (PipFlutterPlayerMultipleGestureDetector.of(context) != null) {
@@ -467,13 +467,13 @@ class _PipFlutterPlayerMaterialControlsState
         if (isFinished) {
           if (_latestValue != null && _latestValue!.isPlaying) {
             if (_displayTapped) {
-              changePlayerControlsNotVisible(true);
+              changePlayerControlsNotVisible(true,11);
             } else {
               cancelAndRestartTimer();
             }
           } else {
             _onPlayPause();
-            changePlayerControlsNotVisible(true);
+            changePlayerControlsNotVisible(true,12);
           }
         } else {
           _onPlayPause();
@@ -607,7 +607,7 @@ class _PipFlutterPlayerMaterialControlsState
     _hideTimer?.cancel();
     _startHideTimer();
 
-    changePlayerControlsNotVisible(false);
+    changePlayerControlsNotVisible(false,13);
     _displayTapped = true;
   }
 
@@ -623,13 +623,13 @@ class _PipFlutterPlayerMaterialControlsState
 
     if (_controlsConfiguration.showControlsOnInitialize) {
       _initTimer = Timer(const Duration(milliseconds: 200), () {
-        changePlayerControlsNotVisible(false);
+        changePlayerControlsNotVisible(false,14);
       });
     }
 
     _controlsVisibilityStreamSubscription =
         _pipFlutterPlayerController!.controlsVisibilityStream.listen((state) {
-      changePlayerControlsNotVisible(!state);
+      changePlayerControlsNotVisible(!state,15);
       if (!controlsNotVisible) {
         cancelAndRestartTimer();
       }
@@ -637,7 +637,7 @@ class _PipFlutterPlayerMaterialControlsState
   }
 
   void _onExpandCollapse() {
-    changePlayerControlsNotVisible(true);
+    changePlayerControlsNotVisible(true,16);
     _pipFlutterPlayerController!.toggleFullScreen();
     _showAfterExpandCollapseTimer =
         Timer(_controlsConfiguration.controlsHideTime, () {
@@ -655,7 +655,7 @@ class _PipFlutterPlayerMaterialControlsState
     }
 
     if (_controller!.value.isPlaying) {
-      changePlayerControlsNotVisible(false);
+      changePlayerControlsNotVisible(false,17);
       _hideTimer?.cancel();
       _pipFlutterPlayerController!.pause();
     } else {
@@ -677,7 +677,7 @@ class _PipFlutterPlayerMaterialControlsState
       return;
     }
     _hideTimer = Timer(const Duration(milliseconds: 3000), () {
-      changePlayerControlsNotVisible(true);
+      changePlayerControlsNotVisible(true,18);
     });
   }
 
@@ -691,7 +691,7 @@ class _PipFlutterPlayerMaterialControlsState
           _latestValue = _controller!.value;
           if (isVideoFinished(_latestValue) &&
               _pipFlutterPlayerController?.isLiveStream() == false) {
-            changePlayerControlsNotVisible(false);
+            changePlayerControlsNotVisible(false,19);
           }
         });
       }

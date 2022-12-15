@@ -240,8 +240,8 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
         break;
       default:
         {
-          print(
-              "统计回放播放时长 event:${event.pipFlutterPlayerEventType.name} ${event.parameters}");
+          // print(
+          //     "统计回放播放时长 event:${event.pipFlutterPlayerEventType.name} ${event.parameters}");
         }
         break;
 
@@ -387,7 +387,6 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
 
   @override
   void dispose() {
-    print("disposedisposedisposedispose");
     pipFlutterPlayerKey.currentState?.dispose();
     pipFlutterPlayerController.dispose();
     super.dispose();

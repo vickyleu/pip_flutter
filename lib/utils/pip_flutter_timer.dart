@@ -94,6 +94,7 @@ class PipTimer {
 
   // 打点  // 进度
   void mark(int currentProgress,{bool force=false}) {
+    print("markmarkmarkmark====>>${force}  ${StackTrace.current}");
     _eventProgress = currentProgress;
     if (_eventName == TimerState.idle || _eventName == TimerState.pause) return;
     if(!force){

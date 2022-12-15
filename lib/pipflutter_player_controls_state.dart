@@ -533,21 +533,16 @@ abstract class PipFlutterPlayerControlsState<T extends StatefulWidget>
   }
 
   ///Called when player controls visibility should be changed.
-  void changePlayerControlsNotVisible(bool notVisible) {
+  void changePlayerControlsNotVisible(bool notVisible,int tag) {
+    if (notVisible) {
+      pipFlutterPlayerController?.postEvent(PipFlutterPlayerEvent(
+          PipFlutterPlayerEventType.controlsHiddenStart));
+    }
+    controlsNotVisible = notVisible;
     if(mounted){
       setState(() {
-        if (notVisible) {
-          pipFlutterPlayerController?.postEvent(PipFlutterPlayerEvent(
-              PipFlutterPlayerEventType.controlsHiddenStart));
-        }
-        controlsNotVisible = notVisible;
+
       });
-    }else{
-      if (notVisible) {
-        pipFlutterPlayerController?.postEvent(PipFlutterPlayerEvent(
-            PipFlutterPlayerEventType.controlsHiddenStart));
-      }
-      controlsNotVisible = notVisible;
     }
   }
 }

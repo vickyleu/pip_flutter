@@ -782,9 +782,10 @@ class PipFlutterPlayerController {
 
   ///Enable/disable controls (when enabled = false, controls will be always hidden)
   void setControlsEnabled(bool enabled) {
-    if (!enabled) {
-      _controlsVisibilityStreamController.add(false);
-    }
+    // if (!enabled) {
+    //   _controlsVisibilityStreamController.add(false);
+    // }
+    _controlsVisibilityStreamController.add(enabled);
     _controlsEnabled = enabled;
   }
 
@@ -1212,6 +1213,7 @@ class PipFlutterPlayerController {
         exitFullScreen();
       }
     }
+    // setControlsEnabled(true);
     videoPlayerController!.refresh();
     return videoPlayerController!.disablePictureInPicture();
   }

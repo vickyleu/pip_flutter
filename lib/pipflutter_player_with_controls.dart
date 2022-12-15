@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:pip_flutter/pipflutter_player_controller.dart';
 import 'package:pip_flutter/pipflutter_player_controller_event.dart';
@@ -33,7 +34,7 @@ class _PipFlutterPlayerWithControlsState
       widget.controller!.pipFlutterPlayerConfiguration.controlsConfiguration;
 
   final StreamController<bool> playerVisibilityStreamController =
-      StreamController();
+  StreamController();
 
   bool _initialized = false;
 
@@ -75,20 +76,20 @@ class _PipFlutterPlayerWithControlsState
   @override
   Widget build(BuildContext context) {
     final PipFlutterPlayerController pipFlutterPlayerController =
-        PipFlutterPlayerController.of(context);
+    PipFlutterPlayerController.of(context);
 
     double? aspectRatio;
     if (pipFlutterPlayerController.isFullScreen) {
       if (pipFlutterPlayerController.pipFlutterPlayerConfiguration
-              .autoDetectFullscreenDeviceOrientation ||
+          .autoDetectFullscreenDeviceOrientation ||
           pipFlutterPlayerController
               .pipFlutterPlayerConfiguration.autoDetectFullscreenAspectRatio) {
         aspectRatio = pipFlutterPlayerController
-                .videoPlayerController?.value.aspectRatio ??
+            .videoPlayerController?.value.aspectRatio ??
             1.0;
       } else {
         aspectRatio = pipFlutterPlayerController
-                .pipFlutterPlayerConfiguration.fullScreenAspectRatio ??
+            .pipFlutterPlayerConfiguration.fullScreenAspectRatio ??
             PipFlutterPlayerUtils.calculateAspectRatio(context);
       }
     } else {
@@ -136,26 +137,32 @@ class _PipFlutterPlayerWithControlsState
     return Container(
       child: Stack(
         fit: StackFit.passthrough,
-        children: <Widget>[
-          if (placeholderOnTop) _buildPlaceholder(pipFlutterPlayerController),
-          Transform.rotate(
+        children: () sync* {
+          if (placeholderOnTop) {
+            yield _buildPlaceholder(pipFlutterPlayerController);
+          }
+          yield Transform.rotate(
             angle: rotation * pi / 180,
             child: _PipFlutterPlayerVideoFitWidget(
               pipFlutterPlayerController,
               pipFlutterPlayerController.pipFlutterPlayerConfiguration.fit,
             ),
-          ),
-          pipFlutterPlayerController.pipFlutterPlayerConfiguration.overlay ??
-              Container(),
-          PipFlutterPlayerSubtitlesDrawer(
+          );
+          yield pipFlutterPlayerController.pipFlutterPlayerConfiguration
+              .overlay ??
+              Container();
+
+          yield PipFlutterPlayerSubtitlesDrawer(
             pipFlutterPlayerController: pipFlutterPlayerController,
             pipFlutterPlayerSubtitlesConfiguration: subtitlesConfiguration,
             subtitles: pipFlutterPlayerController.subtitlesLines,
             playerVisibilityStream: playerVisibilityStreamController.stream,
-          ),
-          if (!placeholderOnTop) _buildPlaceholder(pipFlutterPlayerController),
-          _buildControls(context, pipFlutterPlayerController),
-        ],
+          );
+          if (!placeholderOnTop){
+            yield _buildPlaceholder(pipFlutterPlayerController);
+          }
+          yield _buildControls(context, pipFlutterPlayerController);
+        }().toList(),
       ),
     );
   }
@@ -167,10 +174,8 @@ class _PipFlutterPlayerWithControlsState
         Container();
   }
 
-  Widget _buildControls(
-    BuildContext context,
-    PipFlutterPlayerController pipFlutterPlayerController,
-  ) {
+  Widget _buildControls(BuildContext context,
+      PipFlutterPlayerController pipFlutterPlayerController,) {
     if (controlsConfiguration.showControls) {
       PipFlutterPlayerTheme? playerTheme = controlsConfiguration.playerTheme;
       if (playerTheme == null) {
@@ -216,11 +221,10 @@ class _PipFlutterPlayerWithControlsState
 
 ///Widget used to set the proper box fit of the video. Default fit is 'fill'.
 class _PipFlutterPlayerVideoFitWidget extends StatefulWidget {
-  const _PipFlutterPlayerVideoFitWidget(
-    this.pipFlutterPlayerController,
-    this.boxFit, {
-    Key? key,
-  }) : super(key: key);
+  const _PipFlutterPlayerVideoFitWidget(this.pipFlutterPlayerController,
+      this.boxFit, {
+        Key? key,
+      }) : super(key: key);
 
   final PipFlutterPlayerController pipFlutterPlayerController;
   final BoxFit boxFit;
@@ -289,20 +293,21 @@ class _PipFlutterPlayerVideoFitWidgetState
 
     _controllerEventSubscription =
         widget.pipFlutterPlayerController.controllerEventStream.listen((event) {
-      if (event == PipFlutterPlayerControllerEvent.play) {
-        if (!_started) {
-          setState(() {
-            _started =
-                widget.pipFlutterPlayerController.hasCurrentDataSourceStarted;
-          });
-        }
-      }
-      if (event == PipFlutterPlayerControllerEvent.setupDataSource) {
-        setState(() {
-          _started = false;
+          if (event == PipFlutterPlayerControllerEvent.play) {
+            if (!_started) {
+              setState(() {
+                _started =
+                    widget.pipFlutterPlayerController
+                        .hasCurrentDataSourceStarted;
+              });
+            }
+          }
+          if (event == PipFlutterPlayerControllerEvent.setupDataSource) {
+            setState(() {
+              _started = false;
+            });
+          }
         });
-      }
-    });
   }
 
   @override

@@ -60,6 +60,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
     public func create(withFrame frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?) -> FlutterPlatformView {
         let textureId = (args as! Dictionary<String, AnyObject>)["textureId"] as! NSNumber
         let player = players[textureId.intValue]
+        player!.frame = frame
         return player!
     }
 
@@ -125,7 +126,8 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         }
         let player = players.last
 
-        if player != nil && player!.isPlaying && player!.isPiping {
+        if player != nil &&  player!.isPiping {
+            print("invokeMethod exitPip")
             self.channel.invokeMethod("exitPip", arguments: nil)
         }
         self.bgTask = .invalid

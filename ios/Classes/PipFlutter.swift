@@ -53,6 +53,8 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         }
     }
     
+    var frame:CGRect = .zero
+    
     var isLooping=false
     private(set)var isInitialized=false
     private(set) var key:String?
@@ -105,7 +107,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     }
 
     public func view() -> UIView {
-        let playerView = PipFlutterView(frame:CGRectZero)
+        let playerView = PipFlutterView(frame:self.frame)
         playerView.player = self.player
         return playerView
     }
@@ -378,16 +380,17 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         if (keyPath == "rate") {
             if #available(iOS 10.0, *) {
                 if self.pipController?.isPictureInPictureActive == true {
-                    if self.lastAvPlayerTimeControlStatus != nil && self.lastAvPlayerTimeControlStatus == self.player.timeControlStatus {
-                        if self.player.timeControlStatus == .paused {
-                            self.isPlaying=false
-                            self.eventSink?(["event" : "pause"])
-                            return
-                        }
-                        if self.player.timeControlStatus == .playing {
-                            self.isPlaying = true
-                            self.eventSink?(["event" : "play"])
-                        }
+//                    self.lastAvPlayerTimeControlStatus != nil &&
+                    if self.lastAvPlayerTimeControlStatus == self.player.timeControlStatus {
+//                        if self.player.timeControlStatus == .paused {
+//                            self.isPlaying=false
+//                            self.eventSink?(["event" : "pause"])
+//                            return
+//                        }
+//                        if self.player.timeControlStatus == .playing {
+//                            self.isPlaying = true
+//                            self.eventSink?(["event" : "play"])
+//                        }
                         return
                     }
 
@@ -657,7 +660,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
 
     func setPictureInPicture(pictureInPicture:Bool) {
         self.mPictureInPicture = pictureInPicture
-       print("setPictureInPicture pictureInPicture : \(pictureInPicture)")
+       print("setPictureInPicture pictureInPicture : \(pictureInPicture) pipController:\(self.pipController) mPictureInPicture:\(self.mPictureInPicture) isPictureInPictureActive:\(self.pipController!.isPictureInPictureActive)")
         if #available(iOS 9.0, *) {
             if (self.pipController != nil) && self.mPictureInPicture && !self.pipController!.isPictureInPictureActive {
                
@@ -717,6 +720,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         self.playerLayer!.needsDisplayOnBoundsChange = true
         //  [self._playerLayer addObserver:self forKeyPath:readyForDisplayKeyPath options:NSKeyValueObservingOptionNew context:nil];
         vc.view.layer.addSublayer(self.playerLayer!)
+        self.playerLayer!.isHidden=true
         vc.view.layer.needsDisplayOnBoundsChange = true
         if #available(iOS 9.0, *) {
             self.pipController = nil
@@ -730,6 +734,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         if (self.playerLayer == nil) {
             return
         }
+        self.playerLayer!.isHidden=false
         DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(200), execute:
          {
             self.setPictureInPicture(pictureInPicture: true)
@@ -737,6 +742,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     }
 
     func disablePictureInPictureNoAction() {
+        self.playerLayer?.isHidden=true
         self.eventSink?(["event" : "pipStop"])
     }
     func disablePictureInPicture() {

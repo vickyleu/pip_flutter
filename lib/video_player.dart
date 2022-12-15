@@ -246,13 +246,11 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         case VideoEventType.play:
           value = value.copyWith(isPlaying: true);
           // play(); //TODO check this !!!!
-          // setControlsEnabled(false);
           break;
         case VideoEventType.pause:
           print("VideoEventType.pause TODO check this !!!!");
           value = value.copyWith(isPlaying: false);
           // pause(); //TODO check this !!!!
-          // setControlsEnabled(true);
           break;
         case VideoEventType.seek:
           seekTo(event.position);

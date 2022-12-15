@@ -237,6 +237,7 @@ class PipFlutterPlayerControlsConfiguration {
       pauseIcon: CupertinoIcons.pause_solid,
       skipBackIcon: CupertinoIcons.gobackward_15,
       skipForwardIcon: CupertinoIcons.goforward_15,
+      playerTheme: PipFlutterPlayerTheme.cupertino
     );
   }
 
