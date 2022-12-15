@@ -177,7 +177,6 @@ class _PipFlutterPlayerCupertinoControlsState
       return const SizedBox();
     }
     return AnimatedOpacity(
-      key: GlobalObjectKey(controlsNotVisible),
       opacity: controlsNotVisible ? 0.0 : 1.0,
       duration: _controlsConfiguration.controlsHideTime,
       onEnd: _onPlayerHide,
