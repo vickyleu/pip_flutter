@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:isolate';
 
-import 'package:flutter/cupertino.dart';
 import 'package:pip_flutter/utils/pip_video_record.dart';
 
 enum TimerState { idle, start, pause, mark }
@@ -17,8 +15,16 @@ class PipTimer {
   final int markInterval;
   final SendPort? sendPort;
 
-  PipTimer({required this.callback, this.markInterval = 30, this.sendPort}){
-    _controller.stream..listen((event) {
+  PipTimer({required this.callback, this.markInterval = 30, this.sendPort}) {
+    String? lastEvent = null;
+    _controller.stream
+        .distinct()
+        .listen((event) {
+      if (lastEvent != null && (lastEvent == event['event_name']
+          && lastEvent != "mark")) {
+        return;
+      }
+      lastEvent = event['event_name'];
       // print("接收回调事件:::: onEventChanged timer start");
       callback.call(event);
       try {
@@ -30,16 +36,16 @@ class PipTimer {
   }
 
   final StreamController<Map<String, dynamic>> _controller =
-      StreamController<Map<String, dynamic>>();
+  StreamController<Map<String, dynamic>>();
 
 
   Timer? _countingTimer;
 
-  int _timeInterval=0;
-  int _markTempTimeInterval=0;
-  
+  int _timeInterval = 0;
+  int _markTempTimeInterval = 0;
+
   // 开始计时
-  void start({int? progress=null}) {
+  void start({int? progress = null}) {
     print("timer start");
     if (_eventName != TimerState.idle && _eventName != TimerState.pause) {
       print("接收回调事件::::  timer start");
@@ -48,15 +54,15 @@ class PipTimer {
     _eventName = TimerState.start;
     _eventTime = DateTime.now();
 
-    _timeInterval=0;
-    _markTempTimeInterval=0;
+    _timeInterval = 0;
+    _markTempTimeInterval = 0;
     _countingTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       // Do something here
       _timeInterval++;
     });
     print("接收回调事件:::: onEventChanged timer add");
 
-    if(progress!=null){
+    if (progress != null) {
       _eventProgress = progress!;
     }
     _controller.add({
@@ -81,23 +87,25 @@ class PipTimer {
 
     _countingTimer?.cancel();
     _countingTimer = null;
-    _timeInterval=0;
-    _markTempTimeInterval=0;
+    _timeInterval = 0;
+    _markTempTimeInterval = 0;
     _controller.add({
       'event_name': _eventName.name,
       'event_interval': eventInterval,
       'event_time': _eventTime.toString().substring(0, 19),
       'event_progress': _eventProgress
     });
-
   }
 
   // 打点  // 进度
-  void mark(int currentProgress,{bool force=false}) {
+  void mark(int currentProgress, {bool force = false}) {
     _eventProgress = currentProgress;
     if (_eventName == TimerState.idle || _eventName == TimerState.pause) return;
-    if(!force){
-      if (DateTime.now().difference(_eventTime).inSeconds < markInterval) return;
+    if (!force) {
+      if (DateTime
+          .now()
+          .difference(_eventTime)
+          .inSeconds < markInterval) return;
     }
     _eventName = TimerState.mark;
     _eventTime = DateTime.now();
@@ -122,62 +130,62 @@ class PortContainer {
 }
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  String video_id = "q12131313123";
-  String user_id = "1008611";
-  String? video_record_id = "10010";
-
-  Future.delayed(const Duration(milliseconds: 100)).then((value) async {
-    final db = PipVideoRecordDatabase();
-    await db.init();
-    final receivePort = ReceivePort();
-    final timer = PipTimer(
-        callback: (e) {
-          e.addAll({
-            'video_id': video_id,
-            'user_id': user_id,
-            'video_record_id': video_record_id,
-          });
-          // print("timer:$e");
-        },
-        markInterval: 4,
-        sendPort: receivePort.sendPort);
-    await Isolate.spawn(testIsolate, PortContainer(receivePort.sendPort));
-    receivePort.listen((data) {
-      print("receivePort.listen((data)${data}");
-      if (data is PortContainer) {
-        final sendPort = data.port;
-        sendPort.send(timer);
-      } else if (data is PipVideoRecord) {
-        db.addRecord(data);
-      } else {
-        db.getUserRecords(user_id).then((events) {
-          print("events===>>${events.map((e) => jsonEncode(e.toJson()))}");
-        });
-      }
-    });
-  });
+  // WidgetsFlutterBinding.ensureInitialized();
+  // String video_id = "q12131313123";
+  // String user_id = "1008611";
+  // String? video_record_id = "10010";
+  //
+  // Future.delayed(const Duration(milliseconds: 100)).then((value) async {
+  //   final db = PipVideoRecordDatabase();
+  //   await db.init();
+  //   final receivePort = ReceivePort();
+  //   final timer = PipTimer(
+  //       callback: (e) {
+  //         e.addAll({
+  //           'video_id': video_id,
+  //           'user_id': user_id,
+  //           'video_record_id': video_record_id,
+  //         });
+  //         // print("timer:$e");
+  //       },
+  //       markInterval: 4,
+  //       sendPort: receivePort.sendPort);
+  //   // await Isolate.spawn(testIsolate, PortContainer(receivePort.sendPort));
+  //   receivePort.listen((data) {
+  //     print("receivePort.listen((data)${data}");
+  //     if (data is PortContainer) {
+  //       final sendPort = data.port;
+  //       sendPort.send(timer);
+  //     } else if (data is PipVideoRecord) {
+  //       db.addRecord(data);
+  //     } else {
+  //       db.getUserRecords(user_id).then((events) {
+  //         print("events===>>${events.map((e) => jsonEncode(e.toJson()))}");
+  //       });
+  //     }
+  //   });
+  // });
 }
 
 Future<void> testIsolate(PortContainer portContainer) async {
-  final port = portContainer.port;
-  final receivePort = ReceivePort();
-
-  port.send(PortContainer(receivePort.sendPort));
-  final pipTimer = await receivePort.first as PipTimer;
-
-  int progress = 0;
-  Future.delayed(const Duration(seconds: 4)).then((value) {
-    pipTimer.start();
-    Timer.periodic(const Duration(milliseconds: 600), (timer) {
-      progress++;
-      pipTimer.mark(progress);
-    });
-    Future.delayed(const Duration(seconds: 30)).then((value) {
-      pipTimer.pause();
-      Future.delayed(const Duration(milliseconds: 300)).then((value) {
-        Isolate.exit();
-      });
-    });
-  });
+  // final port = portContainer.port;
+  // final receivePort = ReceivePort();
+  //
+  // port.send(PortContainer(receivePort.sendPort));
+  // final pipTimer = await receivePort.first as PipTimer;
+  //
+  // int progress = 0;
+  // Future.delayed(const Duration(seconds: 4)).then((value) {
+  //   pipTimer.start();
+  //   Timer.periodic(const Duration(milliseconds: 600), (timer) {
+  //     progress++;
+  //     pipTimer.mark(progress);
+  //   });
+  //   Future.delayed(const Duration(seconds: 30)).then((value) {
+  //     pipTimer.pause();
+  //     Future.delayed(const Duration(milliseconds: 300)).then((value) {
+  //       Isolate.exit();
+  //     });
+  //   });
+  // });
 }

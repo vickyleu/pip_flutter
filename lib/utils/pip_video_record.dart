@@ -24,7 +24,7 @@ class PipVideoRecord {
   });
 
   Map<String, dynamic> toJson() {
-    return {
+    final map = {
       'id': id,
       'event_name': eventName,
       'event_time': eventTime,
@@ -34,13 +34,17 @@ class PipVideoRecord {
       'user_id': userId,
       'video_record_id': videoRecordId,
     };
+    if (id == 0) {//如果id是0就不传,让数据库自增,不然会因为同一个id每次都变成替换
+      map.remove('id');
+    }
+    return map;
   }
 
   static PipVideoRecord fromJson(Map<String, dynamic> json) {
     JsonEncoder encoder = const JsonEncoder.withIndent('  ');
     // print("PipVideoRecord fromJson:${encoder.convert(json)}");
     return PipVideoRecord(
-      id: json.containsKey('id') ? json['id']:0,
+      id: json.containsKey('id') ? json['id'] : 0,
       eventName: json['event_name'],
       eventTime: json['event_time'],
       eventProgress: json['event_progress'],
@@ -55,8 +59,6 @@ class PipVideoRecord {
   String toString() {
     return 'PipVideoRecord{id: $id, eventName: $eventName, eventInterval: $eventInterval, eventTime: $eventTime, eventProgress: $eventProgress, videoId: $videoId, userId: $userId, videoRecordId: $videoRecordId}';
   }
-
-
 }
 
 class PipVideoRecordDatabase {
@@ -82,14 +84,27 @@ class PipVideoRecordDatabase {
   }
 
 // 删除记录
-  void removeRecords(List<PipVideoRecord> records) async {
+  Future<void> removeRecords(List<PipVideoRecord> records) async {
     await _database.delete('records',
         where: 'id IN (${records.map((e) => '?').join(', ')})',
         whereArgs: records.map((record) => record.id).toList());
   }
 
+// 删除记录
+  Future<void> removeRecordsFromList(
+      String studentId, List<PipVideoRecord> records) async {
+    await _database.delete(
+      'records',
+      where:
+          'user_id = ? AND (event_name, event_time, video_id) IN (${records.map((e) => "(?,?,?)")}) ',
+      whereArgs: [studentId]..addAll(records
+          .expand((item) => [item.eventName, item.eventTime, item.videoId])
+          .toList()),
+    );
+  }
+
 // 添加记录
-  void addRecord(PipVideoRecord record) async {
+  Future<void> addRecord(PipVideoRecord record) async {
 //     if (record.eventName == 'mark') {
 // // 对于频繁的mark操作，使用compute()进行空间隔离
 //       compute(addRecordHelper, MapEntry(record, this));
