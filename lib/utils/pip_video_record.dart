@@ -93,14 +93,22 @@ class PipVideoRecordDatabase {
 // 删除记录
   Future<void> removeRecordsFromList(
       String studentId, List<PipVideoRecord> records) async {
-    await _database.delete(
+
+    await _database.transaction((txn) async {
+      for (var record in records) {
+        await txn.delete('records',
+            where: 'user_id = ? AND event_name = ? AND event_time = ? AND video_id = ?',
+            whereArgs: [studentId, record.eventName, record.eventTime, record.videoId]);
+      }
+    });
+    /*await _database.delete(
       'records',
       where:
           'user_id = ? AND (event_name, event_time, video_id) IN (${records.map((e) => "(?,?,?)")}) ',
       whereArgs: [studentId]..addAll(records
           .expand((item) => [item.eventName, item.eventTime, item.videoId])
           .toList()),
-    );
+    );*/
   }
 
 // 添加记录

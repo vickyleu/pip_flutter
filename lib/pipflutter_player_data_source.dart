@@ -101,6 +101,7 @@ class PipFlutterPlayerDataSource {
         const PipFlutterPlayerBufferingConfiguration(),
   }) : assert(
             (type == PipFlutterPlayerDataSourceType.network ||
+                    type == PipFlutterPlayerDataSourceType.asset ||
                     type == PipFlutterPlayerDataSourceType.file) ||
                 (type == PipFlutterPlayerDataSourceType.memory &&
                     bytes?.isNotEmpty == true),
@@ -163,6 +164,33 @@ class PipFlutterPlayerDataSource {
   }) {
     return PipFlutterPlayerDataSource(
       PipFlutterPlayerDataSourceType.file,
+      url,
+      subtitles: subtitles,
+      useAsmsSubtitles: useAsmsSubtitles,
+      useAsmsTracks: useAsmsTracks,
+      resolutions: qualities,
+      cacheConfiguration: cacheConfiguration,
+      notificationConfiguration: notificationConfiguration =
+          const PipFlutterPlayerNotificationConfiguration(
+              showNotification: false),
+      overriddenDuration: overriddenDuration,
+      placeholder: placeholder,
+    );
+  }
+
+  factory PipFlutterPlayerDataSource.asset(
+    String url, {
+    List<PipFlutterPlayerSubtitlesSource>? subtitles,
+    bool? useAsmsSubtitles,
+    bool? useAsmsTracks,
+    Map<String, String>? qualities,
+    PipFlutterPlayerCacheConfiguration? cacheConfiguration,
+    PipFlutterPlayerNotificationConfiguration? notificationConfiguration,
+    Duration? overriddenDuration,
+    Widget? placeholder,
+  }) {
+    return PipFlutterPlayerDataSource(
+      PipFlutterPlayerDataSourceType.asset,
       url,
       subtitles: subtitles,
       useAsmsSubtitles: useAsmsSubtitles,

@@ -520,6 +520,48 @@ class PipFlutterPlayerController {
         );
 
         break;
+      case PipFlutterPlayerDataSourceType.asset:
+        // final file = File(pipFlutterPlayerDataSource.url);
+        // if (!file.existsSync()) {
+        //   PipFlutterPlayerUtils.log(
+        //       "File ${file.path} doesn't exists. This may be because "
+        //           "you're acessing file from native path and Flutter doesn't "
+        //           "recognize this path.");
+        // }
+        await videoPlayerController?.setAssetDataSource(
+            pipFlutterPlayerDataSource.url,
+            package: "pip_flutter",
+            showNotification: _pipFlutterPlayerDataSource
+                ?.notificationConfiguration?.showNotification,
+            title:
+            _pipFlutterPlayerDataSource?.notificationConfiguration?.title,
+            author:
+            _pipFlutterPlayerDataSource?.notificationConfiguration?.author,
+            imageUrl: _pipFlutterPlayerDataSource
+                ?.notificationConfiguration?.imageUrl,
+            notificationChannelName: _pipFlutterPlayerDataSource
+                ?.notificationConfiguration?.notificationChannelName,
+            overriddenDuration: _pipFlutterPlayerDataSource!.overriddenDuration,
+            activityName: _pipFlutterPlayerDataSource
+                ?.notificationConfiguration?.activityName,
+        );
+        // await videoPlayerController?.setFileDataSource(
+        //     File(pipFlutterPlayerDataSource.url),
+        //     showNotification: _pipFlutterPlayerDataSource
+        //         ?.notificationConfiguration?.showNotification,
+        //     title:
+        //     _pipFlutterPlayerDataSource?.notificationConfiguration?.title,
+        //     author:
+        //     _pipFlutterPlayerDataSource?.notificationConfiguration?.author,
+        //     imageUrl: _pipFlutterPlayerDataSource
+        //         ?.notificationConfiguration?.imageUrl,
+        //     notificationChannelName: _pipFlutterPlayerDataSource
+        //         ?.notificationConfiguration?.notificationChannelName,
+        //     overriddenDuration: _pipFlutterPlayerDataSource!.overriddenDuration,
+        //     activityName: _pipFlutterPlayerDataSource
+        //         ?.notificationConfiguration?.activityName,
+        //     clearKey: _pipFlutterPlayerDataSource?.drmConfiguration?.clearKey);
+        break;
       case PipFlutterPlayerDataSourceType.file:
         final file = File(pipFlutterPlayerDataSource.url);
         if (!file.existsSync()) {
@@ -528,7 +570,6 @@ class PipFlutterPlayerController {
               "you're acessing file from native path and Flutter doesn't "
               "recognize this path.");
         }
-
         await videoPlayerController?.setFileDataSource(
             File(pipFlutterPlayerDataSource.url),
             showNotification: _pipFlutterPlayerDataSource

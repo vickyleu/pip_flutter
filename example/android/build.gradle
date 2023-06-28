@@ -1,8 +1,24 @@
 buildscript {
     ext.kotlin_version = '1.7.20'
     repositories {
-        google()
-        mavenCentral()
+        all {
+            if (this instanceof MavenArtifactRepository) {
+                def url = url.toString()
+                if ( (url.startsWith("https://plugins.gradle.org")) || (url.startsWith("https://dl.google.com")) || (url.startsWith("https://repo.gradle.org"))
+                ) {
+                    remove(this)
+                }
+            }
+        }
+        maven {
+            url = uri("https://mirrors.cloud.tencent.com/gradle/")
+        }
+        maven {
+            url = uri("https://mirrors.cloud.tencent.com/nexus/repository/maven-public/")
+        }
+        maven {
+            url = uri("https://maven.aliyun.com/repository/gradle-plugin")
+        }
     }
 
     dependencies {
@@ -13,8 +29,18 @@ buildscript {
 
 allprojects {
     repositories {
-        google()
-        mavenCentral()
+        all {
+            if (this instanceof MavenArtifactRepository) {
+                def url = url.toString()
+                if ( (url.startsWith("https://plugins.gradle.org")) || (url.startsWith("https://dl.google.com")) || (url.startsWith("https://repo.gradle.org"))
+                ) {
+                    remove(this)
+                }
+            }
+        }
+        maven {
+            url = uri("https://mirrors.cloud.tencent.com/nexus/repository/maven-public/")
+        }
     }
 }
 
@@ -26,6 +52,6 @@ subprojects {
     project.evaluationDependsOn(':app')
 }
 
-task clean(type: Delete) {
+tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }

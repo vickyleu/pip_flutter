@@ -11,7 +11,7 @@ void main() {
   String user_id = "1008613";
   String? video_record_id = "10010";
   runApp(const MyApp());
-  Future.delayed(const Duration(milliseconds: 100)).then((value) async {
+  /*Future.delayed(const Duration(milliseconds: 100)).then((value) async {
     final db = PipVideoRecordDatabase();
     await db.init();
     final receivePort = ReceivePort();
@@ -46,7 +46,7 @@ void main() {
         });
       }
     });
-  });
+  });*/
 }
 
 Future<void> testIsolate(PortContainer portContainer) async {
@@ -173,9 +173,11 @@ class _PictureInPicturePageState extends State<PictureInPicturePage> {
     }, pipInBackgroundCallback: (position, duration) {
       // print("PictureInPicture === >>position=>$position duration=>$duration");
     });
+    // 'asset': dataSource.asset,
+    // 'package': dataSource.package,
     pipFlutterPlayerController.setupDataSource(PipFlutterPlayerDataSource(
-        PipFlutterPlayerDataSourceType.network,
-        'https://sourceqn3.uooconline.com/course900/20210207%E4%BF%AE%E6%94%B9%E4%B8%8A%E4%BC%A0%E6%9B%B4%E6%96%B0/1.3%E5%85%AC%E5%8F%B8%E5%88%B6%E4%BC%81%E4%B8%9A.mp4',
+        PipFlutterPlayerDataSourceType.asset,
+        'assets/recording.mp4',
         // 'http://vfx.mtime.cn/Video/2019/03/09/mp4/190309153658147087.mp4',
         // 'http://vfx.mtime.cn/Video/2019/02/04/mp4/190204084208765161.mp4',
         // 'http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4',
