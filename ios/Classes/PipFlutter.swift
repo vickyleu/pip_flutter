@@ -373,11 +373,14 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
                 return
             }
           
-            if let currentTime = self.player.currentItem?.currentTime() {
-                let second = CMTimeGetSeconds(currentTime)
-               
-                self.seekTo(location: Int(second*1000) )
+            if(self.stalledCount<3){
+                if let currentTime = self.player.currentItem?.currentTime() {
+                    let second = CMTimeGetSeconds(currentTime)
+                   
+                    self.seekTo(location: Int(second*1000)+10 )
+                }
             }
+            
             self.perform(#selector(self.startStalledCheck), with:nil, afterDelay:1)
 
         }
