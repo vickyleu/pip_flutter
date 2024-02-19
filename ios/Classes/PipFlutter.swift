@@ -343,12 +343,10 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
 
    @objc func startStalledCheck() {
         guard let currentItem = self.player.currentItem else {return}
-      
+
+        print("startStalledCheck \(self.availableDuration() - CMTimeGetSeconds(currentItem.currentTime()))  availableDuration()\(self.availableDuration())  currentItemTime() \(CMTimeGetSeconds(currentItem.currentTime()) )")
         if currentItem.isPlaybackLikelyToKeepUp ||
-            self.availableDuration() - CMTimeGetSeconds(currentItem.currentTime()) > 3.0 {
-//            if(self.isPlaying){
-//               
-//            }
+            self.availableDuration() - CMTimeGetSeconds(currentItem.currentTime()) > 10.0 {
             self.play()
             if self.eventSink != nil {
                 var values = [[Int64]]()
@@ -373,6 +371,12 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
                         message:"Failed to load video: playback stalled",
                         details:nil))
                 return
+            }
+          
+            if let currentTime = self.player.currentItem?.currentTime() {
+                let second = CMTimeGetSeconds(currentTime)
+               
+                self.seekTo(location: Int(second*1000) )
             }
             self.perform(#selector(self.startStalledCheck), with:nil, afterDelay:1)
 
