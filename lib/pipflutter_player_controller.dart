@@ -647,6 +647,7 @@ class PipFlutterPlayerController {
     final fullScreenByDefault =
         pipFlutterPlayerConfiguration.fullScreenByDefault;
     if (pipFlutterPlayerConfiguration.autoPlay) {
+      print("自动播放打开了???");
       if (fullScreenByDefault && !isFullScreen) {
         enterFullScreen();
       }

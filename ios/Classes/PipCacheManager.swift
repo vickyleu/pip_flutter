@@ -1,8 +1,8 @@
-import AVKit
-import Cache
 import HLSCachingReverseProxyServer
 import GCDWebServer
+import AVKit
 import PINCache
+import Cache
 
 public class PipCacheManager{
 
@@ -12,28 +12,15 @@ public class PipCacheManager{
 
     var completionHandler: ((_ success:Bool) -> Void)? = nil
 
-    var diskConfig = DiskConfig(name: "PipFlutterCache", expiry: .date(Date().addingTimeInterval(3600*24*30)),
-                                maxSize: 100*1024*1024)
-    
+
+ 
     // Flag whether the CachingPlayerItem was already cached.
     var _existsInStorage: Bool = false
     
-    let memoryConfig = MemoryConfig(
-      // Expiry date that will be applied by default for every added object
-      // if it's not overridden in the `setObject(forKey:expiry:)` method
-      expiry: .never,
-      // The maximum number of objects in memory the cache should hold
-      countLimit: 0,
-      // The maximum total cost that the cache can hold before it starts evicting objects, 0 for no limit
-      totalCostLimit: 0
-    )
-    
     var server: HLSCachingReverseProxyServer?
 
-    lazy var storage: Cache.Storage<String,Data>? = {
-        return try? Cache.Storage<String,Data>(diskConfig: diskConfig, memoryConfig: memoryConfig, transformer: TransformerFactory.forCodable(ofType: Data.self))
-    }()
     
+  
 
     ///Setups cache server for HLS streams
     public func setup(){
@@ -45,11 +32,35 @@ public class PipCacheManager{
         server?.start(port: 8080)
     }
     
+    
+    var diskConfig = DiskConfig(name: "PipFlutterCache", expiry: .date(Date().addingTimeInterval(3600*24*30)),
+                                maxSize: 100*1024*1024)
+
+    let memoryConfig = MemoryConfig(
+      // Expiry date that will be applied by default for every added object
+      // if it's not overridden in the `setObject(forKey:expiry:)` method
+      expiry: .never,
+      // The maximum number of objects in memory the cache should hold
+      countLimit: 0,
+      // The maximum total cost that the cache can hold before it starts evicting objects, 0 for no limit
+      totalCostLimit: 0
+    )
+    lazy var storage: Cache.Storage<String,Data>? = {
+        return try? Cache.Storage<String,Data>(diskConfig: diskConfig, memoryConfig: memoryConfig, transformer: TransformerFactory.forCodable(ofType: Data.self))
+    }()
+
+
     public func setMaxCacheSize(_ maxCacheSize: NSNumber?){
         if let unsigned = maxCacheSize {
             let _maxCacheSize = unsigned.uintValue
             diskConfig = DiskConfig(name: "PipFlutterCache", expiry: .date(Date().addingTimeInterval(3600*24*30)), maxSize: _maxCacheSize)
-        }        
+        }
+    }
+    
+    // Remove all objects
+    public func clearCache(){
+        try? storage?.removeAll()
+        self._preCachedURLs = Dictionary<String,PipCachingPlayerItem>()
     }
 
     // MARK: - Logic
@@ -129,12 +140,7 @@ public class PipCacheManager{
         playerItem.delegate = self
         return playerItem
     }
-    
-    // Remove all objects
-    public func clearCache(){
-        try? storage?.removeAll()
-        self._preCachedURLs = Dictionary<String,PipCachingPlayerItem>()
-    }
+  
     
     private func getMimeType(url: URL, explicitVideoExtension: String?) -> (String,String){
         var videoExtension = url.pathExtension

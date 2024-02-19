@@ -229,15 +229,16 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         if showNotificationObject != nil {
             showNotification = dataSource["showNotification"] as! Bool
         }
-        let title = dataSource["title"] as! String
-        let author = dataSource["author"] as! String
-        let imageUrl = dataSource["imageUrl"] as? String
-
-        if showNotification {
-            self.setRemoteCommandsNotificationActive()
-            self.setupRemoteCommands(player)
-            self.setupRemoteCommandNotification(player, title, author, imageUrl)
-            self.setupUpdateListener(player, title, author, imageUrl)
+        if let title = dataSource["title"] as? String ,
+           let author = dataSource["author"] as? String
+           {
+            let imageUrl = dataSource["imageUrl"] as? String
+            if showNotification {
+                self.setRemoteCommandsNotificationActive()
+                self.setupRemoteCommands(player)
+                self.setupRemoteCommandNotification(player, title, author, imageUrl)
+                self.setupUpdateListener(player, title, author, imageUrl)
+            }
         }
     }
 

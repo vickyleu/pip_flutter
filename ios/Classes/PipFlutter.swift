@@ -345,8 +345,27 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         guard let currentItem = self.player.currentItem else {return}
       
         if currentItem.isPlaybackLikelyToKeepUp ||
-            self.availableDuration() - CMTimeGetSeconds(currentItem.currentTime()) > 10.0 {
+            self.availableDuration() - CMTimeGetSeconds(currentItem.currentTime()) > 3.0 {
+//            if(self.isPlaying){
+//               
+//            }
             self.play()
+            if self.eventSink != nil {
+                var values = [[Int64]]()
+                currentItem.loadedTimeRanges.forEach { rangeValue in
+                    let range = rangeValue.timeRangeValue
+                    let start = PipFlutterTimeUtils.timeToMillis(range.start)
+                    var end = start + PipFlutterTimeUtils.timeToMillis(range.duration)
+                    if CMTIME_IS_VALID(self.player.currentItem!.forwardPlaybackEndTime){
+                        let endTime = PipFlutterTimeUtils.timeToMillis(self.player.currentItem!.forwardPlaybackEndTime)
+                        if end > endTime {
+                            end = endTime
+                        }
+                    }
+                    values.append([start,end])
+                }
+                self.eventSink!(["event" : "bufferingUpdate", "values" : values, "key" : self.key as Any])
+            }
         } else {
             self.stalledCount+=1
             if self.stalledCount > 60 {
@@ -355,7 +374,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
                         details:nil))
                 return
             }
-            self.perform(Selector("startStalledCheck"), with:nil, afterDelay:1)
+            self.perform(#selector(self.startStalledCheck), with:nil, afterDelay:1)
 
         }
     }
@@ -428,7 +447,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             }
         }
 
-        var context = context
+        let context = context
         if context != nil{
             if(context! == timeRangeContext && object is AVPlayerItem){
                 if self.eventSink != nil {
