@@ -1,5 +1,6 @@
 package com.example.pip_flutter
 
+import android.annotation.SuppressLint
 import android.app.*
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -170,6 +171,20 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
 
     override fun onActivityPostResumed(activity: Activity) {
         super.onActivityPostResumed(activity)
+        val flag=isFromPipStartEventFlag
+        isFromPipStartEventFlag=false
+        if(flag){
+            if (videoPlayers.size() != 1) return
+            if (activity != this.activity || !isPictureInPictureSupported()) return
+            Thread{
+                Thread.sleep(500)
+                activity.runOnUiThread {
+                    val player = videoPlayers.valueAt(0)
+                    Log.wtf(TAG, "这里需要恢复了????")
+                    player.play()
+                }
+            }.start()
+        }
     }
 
     override fun onActivityPaused(activity: Activity) {
@@ -177,6 +192,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
     }
 
 
+    private var isFromPipStartEventFlag=false
     override fun onActivityPrePaused(activity: Activity) {
         if (videoPlayers.size() != 1) return
         if (activity != this.activity || !isPictureInPictureSupported()) return
@@ -186,6 +202,10 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
                     )
             && !player.isPiping()) {
             Log.e(TAG, "onActivityPaused")
+            if(player.isPlaying()||player.isBuffering()) {
+                Log.wtf(TAG, "这里需要暂停了????")
+                isFromPipStartEventFlag=true
+            }
             flutterState!!.invokeMethod("prepareToPip")
         }
         super.onActivityPrePaused(activity)
@@ -206,11 +226,13 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
 
     override fun onActivityResumed(activity: Activity) {
 
+
     }
 
     /**
      * Activity mCanEnterPictureInPicture  wasn't update by performResume,should change it by private api
      */
+    @SuppressLint("SoonBlockedPrivateApi")
     private fun setCanEnterPictureInPicture(activity: Activity) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -517,7 +539,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
                 val player = videoPlayers[textureId] ?: return
                 val event: MutableMap<String, Any> = java.util.HashMap()
                 if (intent.action == ACTION_REPLAY) {
-                    // Handle the pause action.
+                    // Handle the replay action.
                     player.playFromStart()
                     event["event"] = "play"
                     player.eventSink.success(event)
@@ -528,8 +550,10 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
                             true
                         )
                     )
+
                 } else if (intent.action == ACTION_PAUSE) {
                     // Handle the pause action.
+                    player.pause()
                     event["event"] = "pause"
                     player.eventSink.success(event)
                     act.setPictureInPictureParams(
@@ -539,8 +563,10 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
                             false
                         )
                     )
+
                 } else if (intent.action == ACTION_PLAY) {
                     // Handle the play action.
+                    player.play()
                     event["event"] = "play"
                     player.eventSink.success(event)
                     act.setPictureInPictureParams(
@@ -550,6 +576,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
                             true
                         )
                     )
+
                 }
             }
         }
@@ -573,6 +600,9 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
                 "Play"
             }
         }
+
+        Log.wtf("getPictureInPictureParams","$str the video, ${Log.getStackTraceString(Throwable())}")
+
         return builder.setActions(
             arrayListOf<RemoteAction>().apply {
                 add(
@@ -632,9 +662,11 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
             player.setupMediaSession(flutterState!!.applicationContext, true)
             setCanEnterPictureInPicture(act)
             val applicationContext = act.applicationContext
+
             val result = act.enterPictureInPictureMode(
                 getPictureInPictureParams(applicationContext, textureId, true)
             )
+
             startPictureInPictureListenerTimer(player)
             player.onPictureInPictureStatusChanged(true)
 
@@ -677,8 +709,6 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
                     countingPlayer(player)
                     pipHandler!!.postDelayed(pipRunnable!!, 100)
                 } else {
-
-
                     player.onPictureInPictureStatusChanged(false)
                     player.disposeMediaSession()
                     stopPipHandler()
@@ -700,6 +730,7 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
     }
 
     private fun dispose(player: PipFlutterPlayer, textureId: Long) {
+        Log.wtf("mother fucker dispose", "dispose: ${Log.getStackTraceString(Throwable())}")
         player.dispose()
         videoPlayers.remove(textureId)
         dataSources.remove(textureId)

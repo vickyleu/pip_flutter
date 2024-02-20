@@ -487,8 +487,15 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                     player.setDataSourceAsset(asset: assetPath, withKey: key, withCertificateUrl: certificateUrl, withLicenseUrl: licenseUrl, cacheKey: cacheKey, cacheManager: _cacheManager, overriddenDuration: overriddenDuration)
                    
                 } else if (uriArg != nil) {
+                    guard let uri = uriArg,
+                          let encodedURI = uri.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed),
+                          let url = URL(string: encodedURI) else {
+                        // 处理 URL 无法创建的情况，可能是 uriArg 为 nil 或者 uriArg 不是一个有效的 URL 字符串
+                        print("Invalid URL")
+                        return
+                    }
                     
-                    player.setDataSourceURL(url: URL.init(string: uriArg!)!, withKey: key, withCertificateUrl: certificateUrl, withLicenseUrl: licenseUrl, withHeaders: headers!, withCache: useCache, cacheKey: cacheKey, cacheManager: _cacheManager, overriddenDuration: overriddenDuration, videoExtension: videoExtension)
+                    player.setDataSourceURL(url: url, withKey: key, withCertificateUrl: certificateUrl, withLicenseUrl: licenseUrl, withHeaders: headers!, withCache: useCache, cacheKey: cacheKey, cacheManager: _cacheManager, overriddenDuration: overriddenDuration, videoExtension: videoExtension)
                 } else {
                     result(FlutterMethodNotImplemented)
                     return
