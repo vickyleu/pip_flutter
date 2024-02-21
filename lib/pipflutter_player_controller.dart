@@ -675,7 +675,7 @@ class PipFlutterPlayerController {
 
   ///Method which is invoked when full screen changes.
   Future<void> _onFullScreenStateChanged() async {
-    if (videoPlayerController?.value.isPlaying == true && !_isFullScreen) {
+    if ((videoPlayerController?.value.isPlaying == true ||videoPlayerController?.value.isBuffering == true) && !_isFullScreen) {
       enterFullScreen();
       videoPlayerController?.removeListener(_onFullScreenStateChanged);
     }

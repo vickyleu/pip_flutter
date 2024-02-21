@@ -269,14 +269,10 @@ class _ProgressBarPainter extends CustomPainter {
       value.alreadyBuffered.addAll(finalRanges);
     }
     updateBufferedRanges(finalRanges);
-    print("alreadyBuffered.length=${value.alreadyBuffered.length}");
-
     for (int i = 0; i < value.alreadyBuffered.length; i++) {
       DurationRange range = value.alreadyBuffered[i];
       final double start = range.startFraction(value.duration!) * size.width;
       final double end = range.endFraction(value.duration!) * size.width;
-      print("start: $start, end: $end, playedPart: $playedPart");
-      print("查询缓存时间 i=$i range:${range.start.inSeconds}==${range.end.inSeconds}");
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromPoints(

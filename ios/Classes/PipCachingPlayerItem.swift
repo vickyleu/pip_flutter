@@ -222,7 +222,7 @@ open class PipCachingPlayerItem: AVPlayerItem {
             self.customFileExtension = ext
         }
         
-        let asset = AVURLAsset(url: urlWithCustomScheme)
+        let asset = AVURLAsset(url: urlWithCustomScheme,options: [AVURLAssetPreferPreciseDurationAndTimingKey:true])
         asset.resourceLoader.setDelegate(resourceLoaderDelegate, queue: DispatchQueue.main)
         super.init(asset: asset, automaticallyLoadedAssetKeys: nil)
         
@@ -247,7 +247,7 @@ open class PipCachingPlayerItem: AVPlayerItem {
         resourceLoaderDelegate.playingFromData = true
         resourceLoaderDelegate.mimeType = mimeType
         
-        let asset = AVURLAsset(url: fakeUrl)
+        let asset = AVURLAsset(url: fakeUrl,options: [AVURLAssetPreferPreciseDurationAndTimingKey:true])
         asset.resourceLoader.setDelegate(resourceLoaderDelegate, queue: DispatchQueue.main)
         super.init(asset: asset, automaticallyLoadedAssetKeys: nil)
         resourceLoaderDelegate.owner = self

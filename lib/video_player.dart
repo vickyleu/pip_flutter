@@ -153,7 +153,7 @@ class VideoPlayerValue {
         'position: $position, '
         'absolutePosition: $absolutePosition, '
         'buffered: [${buffered.join(', ')}], '
-        'isPlaying: $isPlaying, '
+        'isPlaying: ${isPlaying||isBuffering}, '
         'isLooping: $isLooping, '
         'isBuffering: $isBuffering, '
         'volume: $volume, '
@@ -506,7 +506,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     if ((value.isPlaying)) {
       await _videoPlayerPlatform.play(_textureId);
       _timer = Timer.periodic(
-        const Duration(milliseconds: 300),
+        const Duration(milliseconds: 600),
         (Timer timer) async {
           if (_isDisposed) {
             return;

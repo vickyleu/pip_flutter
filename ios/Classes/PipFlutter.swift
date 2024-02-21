@@ -280,8 +280,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             item = cacheManager.getCachingPlayerItemForNormalPlayback(url, cacheKey:cacheKey, videoExtension: videoExtension, headers:headers!)
         } else {
             let urlSpecial = url//.specialSchemeURL
-            
-            let asset:AVURLAsset! = AVURLAsset(url: urlSpecial, options:["AVURLAssetHTTPHeaderFieldsKey" : headers as Any])
+            let asset:AVURLAsset! = AVURLAsset(url: urlSpecial, options:["AVURLAssetHTTPHeaderFieldsKey" : headers as Any,AVURLAssetPreferPreciseDurationAndTimingKey:true])
             if certificateUrl != nil && certificateUrl!.lengthOfBytes(using: .utf8) > 0 {
                 self.loaderDelegate =   PipFlutterEzDrmAssetsLoaderDelegate.init(URL.init(string: certificateUrl!)!, URL.init(string: licenseUrl!)!)
                 //            dispatch_queue_attr_t qos = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INTERACTIVE, -1);
@@ -291,7 +290,6 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             }
             let streamQueue = DispatchQueue.init(label: "streamQueue")
             asset.resourceLoader.setDelegate(self.loaderDelegate, queue: streamQueue)
-            print("url====>setDelegate>>>\(urlSpecial)")
             item = AVPlayerItem(asset: asset)
         }
         
@@ -350,8 +348,6 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     
     @objc func startStalledCheck() {
         guard let currentItem = self.player.currentItem else {return}
-        
-        print("startStalledCheck \(self.availableDuration() - CMTimeGetSeconds(currentItem.currentTime()))  availableDuration()\(self.availableDuration())  currentItemTime() \(CMTimeGetSeconds(currentItem.currentTime()) )")
         if currentItem.isPlaybackLikelyToKeepUp ||
             self.availableDuration() - CMTimeGetSeconds(currentItem.currentTime()) > 10.0 {
             self.play()
@@ -381,11 +377,12 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             }
             
             if(self.stalledCount<2){
-                if let currentTime = self.player.currentItem?.currentTime() {
-                    let second = CMTimeGetSeconds(currentTime)
-                    
-                    self.seekTo(location: Int(second*1000)+100 )
+                guard let currentItem = self.player.currentItem else{
+                    return
                 }
+                let currentTime = currentItem.currentTime()
+                let second = CMTimeGetSeconds(currentTime)
+                self.seekTo(location:Int(second*1000)+500) //
             }
             
             self.perform(#selector(self.startStalledCheck), with:nil, afterDelay:1)
@@ -411,9 +408,6 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     public override  func  observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
         
         if keyPath == "timeControlStatus", let newStatusValue = change?[.newKey] as? Int, let newStatus = AVPlayer.TimeControlStatus(rawValue: newStatusValue) {
-            
-            print("timeControlStatus  newStatusValue:\(newStatusValue)  newStatus:\(newStatus) self.player.rate:\(self.player.rate)  isPictureInPictureActive=\(self.pipController?.isPictureInPictureActive == true)  self.player.timeControlStatus:\(self.player.timeControlStatus) lastAvPlayerTimeControlStatus:\(self.lastAvPlayerTimeControlStatus?.rawValue)")
-            
             if newStatus == .paused && self.player.rate == 0 && self.pipController?.isPictureInPictureActive == true {
                 
                 if self.lastAvPlayerTimeControlStatus != self.player.timeControlStatus{
@@ -616,11 +610,12 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     }
     
     func position() -> Int64 {
-        return PipFlutterTimeUtils.timeToMillis(self.player.currentTime() )
+        let millis = PipFlutterTimeUtils.timeToMillis(self.player.currentTime() )
+        print("_applyPlayPause position  \(millis)  =====  PipFlutterTimeUtils.timeToMillis")
+        return millis
     }
     
     func absolutePosition() -> Int64 {
-        
         if self.player.currentItem!.currentDate() != nil {
             return PipFlutterTimeUtils.timeToMillis(CMTime(value: CMTimeValue(self.player.currentItem!.currentDate()!.timeIntervalSince1970), timescale: 1) )
         }else{
@@ -649,15 +644,18 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         if wasPlaying {
             self.player.pause()
         }
+        DispatchQueue.main.async {
+            self.player.currentItem?.seek(to: CMTimeMake(value: Int64(location), timescale: 1000),
+                             toleranceBefore:CMTime.zero,
+                             toleranceAfter:CMTime.zero,
+                             completionHandler:{ (finished:Bool) in
+                if wasPlaying {
+                    self.player.rate = self.playerRate
+                    self.player.play()
+                }
+            })
+        }
         
-        self.player.seek(to: CMTimeMake(value: Int64(location), timescale: 1000),
-                         toleranceBefore:CMTime.zero,
-                         toleranceAfter:CMTime.zero,
-                         completionHandler:{ (finished:Bool) in
-            if wasPlaying {
-                self.player.rate = self.playerRate
-            }
-        })
     }
     
     // `setIsLooping:` has moved as a setter.
@@ -711,7 +709,6 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     
     func setPictureInPicture(pictureInPicture:Bool) {
         self.mPictureInPicture = pictureInPicture
-        print("setPictureInPicture pictureInPicture : \(pictureInPicture) pipController:\(self.pipController) mPictureInPicture:\(self.mPictureInPicture) isPictureInPictureActive:\(self.pipController!.isPictureInPictureActive)")
         if #available(iOS 9.0, *) {
             if (self.pipController != nil) && self.mPictureInPicture && !self.pipController!.isPictureInPictureActive {
                 
@@ -758,8 +755,6 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     
     
     func playerLayerSetup(frame:CGRect) {
-        print("setPictureInPicture pictureInPicture : playerLayerSetup\(frame)")
-        //        self.setPictureInPicture(pictureInPicture: false)
         self.mPictureInPicture = false
         self.playerToGoPipFlag=true
         if (self.playerLayer != nil) {

@@ -552,10 +552,14 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 result(nil)
                 break
             case "position":
-                result(player.position())
+                DispatchQueue.main.async {
+                    result(player.position())
+                }
                 break
             case "absolutePosition":
-                result(player.absolutePosition())
+                DispatchQueue.main.async {
+                    result(player.absolutePosition())
+                }
                 break
             case "seekTo":
                 player.seekTo(location: argsMap["location"] as! Int)

@@ -465,7 +465,7 @@ class _PipFlutterPlayerMaterialControlsState
             ),
       onClicked: () {
         if (isFinished) {
-          if (_latestValue != null && _latestValue!.isPlaying) {
+          if (_latestValue != null && (_latestValue!.isPlaying || _latestValue!.isBuffering)) {
             if (_displayTapped) {
               changePlayerControlsNotVisible(true,11);
             } else {
@@ -654,7 +654,7 @@ class _PipFlutterPlayerMaterialControlsState
       isFinished = _latestValue!.position >= _latestValue!.duration!;
     }
 
-    if (_controller!.value.isPlaying) {
+    if (_controller!.value.isPlaying || _controller!.value.isBuffering ) {
       changePlayerControlsNotVisible(false,17);
       _hideTimer?.cancel();
       _pipFlutterPlayerController!.pause();

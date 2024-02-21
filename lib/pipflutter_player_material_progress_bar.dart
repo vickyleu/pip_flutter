@@ -79,7 +79,7 @@ class _VideoProgressBarState
           return;
         }
 
-        _controllerWasPlaying = controller!.value.isPlaying;
+        _controllerWasPlaying = (controller!.value.isPlaying);
         if (_controllerWasPlaying) {
           controller!.pause();
         }

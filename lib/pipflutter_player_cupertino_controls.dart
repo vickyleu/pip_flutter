@@ -319,7 +319,7 @@ class _PipFlutterPlayerCupertinoControlsState
   Expanded _buildHitArea() {
     return Expanded(
       child: GestureDetector(
-        onTap: _latestValue != null && _latestValue!.isPlaying
+        onTap: _latestValue != null && (_latestValue!.isPlaying||_latestValue!.isBuffering)
             ? () {
           if (controlsNotVisible == true) {
             cancelAndRestartTimer();
@@ -423,7 +423,6 @@ class _PipFlutterPlayerCupertinoControlsState
   GestureDetector _buildPlayPause(VideoPlayerController controller,
       Color iconColor,
       double barHeight,) {
-    print("controller.value.isPlaying::::${(controller.value.isPlaying||controller.value.isBuffering)?"在播放":"暂停了"}");
     return GestureDetector(
       onTap: _onPlayPause,
       child: Container(
@@ -701,7 +700,7 @@ class _PipFlutterPlayerCupertinoControlsState
       isFinished = _latestValue!.position >= _latestValue!.duration!;
     }
 
-    if (_controller!.value.isPlaying) {
+    if (_controller!.value.isPlaying || _controller!.value.isBuffering ) {
       changePlayerControlsNotVisible(false, 7);
       _hideTimer?.cancel();
       _pipFlutterPlayerController!.pause();
