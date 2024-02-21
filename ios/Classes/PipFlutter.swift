@@ -291,6 +291,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             let streamQueue = DispatchQueue.init(label: "streamQueue")
             asset.resourceLoader.setDelegate(self.loaderDelegate, queue: streamQueue)
             item = AVPlayerItem(asset: asset)
+            item.preferredForwardBufferDuration = TimeInterval(50)
         }
         
         if  #available(iOS 10.0, *), overriddenDuration > 0 {
@@ -300,6 +301,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     }
     
     func setDataSourcePlayerItem(item:AVPlayerItem!, withKey key:String!) {
+        self.removeObservers()
         self.key = key
         self.stalledCount = 0
         self.isStalledCheckStarted = false
@@ -332,7 +334,6 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
                 }
             }
         }
-        
         asset.loadValuesAsynchronously(forKeys: ["tracks"],completionHandler: assetCompletionHandler)
         
         self.addObservers(item: item)
@@ -376,13 +377,13 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
                 return
             }
             
-            if(self.stalledCount<2){
+            if(self.stalledCount%2 == 0){
                 guard let currentItem = self.player.currentItem else{
                     return
                 }
                 let currentTime = currentItem.currentTime()
                 let second = CMTimeGetSeconds(currentTime)
-                self.seekTo(location:Int(second*1000)+500) //
+                self.seekTo(location:Int(second*1000)+50)
             }
             
             self.perform(#selector(self.startStalledCheck), with:nil, afterDelay:1)
@@ -406,123 +407,125 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     
     
     public override  func  observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
-        
-        if keyPath == "timeControlStatus", let newStatusValue = change?[.newKey] as? Int, let newStatus = AVPlayer.TimeControlStatus(rawValue: newStatusValue) {
-            if newStatus == .paused && self.player.rate == 0 && self.pipController?.isPictureInPictureActive == true {
-                
-                if self.lastAvPlayerTimeControlStatus != self.player.timeControlStatus{
-                    // 缓冲不足，且画中画模式激活，手动继续播放
-                    player.play()
-                    self.lastAvPlayerTimeControlStatus = self.player.timeControlStatus
-                }else{
-                    if(self.playerToGoPipFlag){
-                        player.play()
-                        self.playerToGoPipFlag=false
-                    }
-                }
-            }
-            return
-        }else if (keyPath == "rate") {
-            if #available(iOS 10.0, *) {
-                if self.pipController?.isPictureInPictureActive == true {
-                    //                    self.lastAvPlayerTimeControlStatus != nil &&
-                    if self.lastAvPlayerTimeControlStatus == self.player.timeControlStatus {
-                        //                        if self.player.timeControlStatus == .paused {
-                        //                            self.isPlaying=false
-                        //                            self.eventSink?(["event" : "pause"])
-                        //                            return
-                        //                        }
-                        //                        if self.player.timeControlStatus == .playing {
-                        //                            self.isPlaying = true
-                        //                            self.eventSink?(["event" : "play"])
-                        //                        }
-                        return
-                    }
+        DispatchQueue.main.async {
+            if keyPath == "timeControlStatus", let newStatusValue = change?[.newKey] as? Int, let newStatus = AVPlayer.TimeControlStatus(rawValue: newStatusValue) {
+                if newStatus == .paused && self.player.rate == 0 && self.pipController?.isPictureInPictureActive == true {
                     
-                    if self.player.timeControlStatus == .paused {
+                    if self.lastAvPlayerTimeControlStatus != self.player.timeControlStatus{
+                        // 缓冲不足，且画中画模式激活，手动继续播放
+                        self.player.play()
                         self.lastAvPlayerTimeControlStatus = self.player.timeControlStatus
-                        self.isPlaying=false
-                        self.eventSink?(["event" : "pause"])
-                        
-                        return
-                        
-                    }
-                    if self.player.timeControlStatus == .playing {
-                        self.lastAvPlayerTimeControlStatus = self.player.timeControlStatus
-                        self.isPlaying = true
-                        self.eventSink?(["event" : "play"])
-                        
-                    }
-                }
-            }
-            let currentItem = self.player.currentItem
-            
-            let currentTime = currentItem?.currentTime() ?? .zero
-            let duration = currentItem?.duration ?? .zero
-            
-            
-            
-            if self.player.rate == 0 && //if player rate dropped to 0
-                ///TODO  这里需要修改
-                currentTime > .zero &&
-                currentTime < duration &&
-                //CMTIME_COMPARE_INLINE(_player.currentItem.currentTime, >, kCMTimeZero) && //if video was started
-                //CMTIME_COMPARE_INLINE(_player.currentItem.currentTime, <, _player.currentItem.duration) && //but not yet finished
-                self.isPlaying { //instance variable to handle overall state (changed to YES when user triggers playback)
-                self.handleStalled()
-            }
-        }
-        
-        let context = context
-        if context != nil{
-            if(context! == timeRangeContext && object is AVPlayerItem){
-                if self.eventSink != nil {
-                    var values = [[Int64]]()
-                    (object as! AVPlayerItem).loadedTimeRanges.forEach { rangeValue in
-                        let range = rangeValue.timeRangeValue
-                        let start = PipFlutterTimeUtils.timeToMillis(range.start)
-                        var end = start + PipFlutterTimeUtils.timeToMillis(range.duration)
-                        if CMTIME_IS_VALID(self.player.currentItem!.forwardPlaybackEndTime){
-                            let endTime = PipFlutterTimeUtils.timeToMillis(self.player.currentItem!.forwardPlaybackEndTime)
-                            if end > endTime {
-                                end = endTime
-                            }
+                    }else{
+                        if(self.playerToGoPipFlag){
+                            self.player.play()
+                            self.playerToGoPipFlag=false
                         }
-                        values.append([start,end])
                     }
-                    self.eventSink!(["event" : "bufferingUpdate", "values" : values, "key" : self.key as Any])
                 }
-            } else if context! == presentationSizeContext {
-                self.onReadyToPlay()
+                return
+            }else if (keyPath == "rate") {
+                if #available(iOS 10.0, *) {
+                    if self.pipController?.isPictureInPictureActive == true {
+                        //                    self.lastAvPlayerTimeControlStatus != nil &&
+                        if self.lastAvPlayerTimeControlStatus == self.player.timeControlStatus {
+                            //                        if self.player.timeControlStatus == .paused {
+                            //                            self.isPlaying=false
+                            //                            self.eventSink?(["event" : "pause"])
+                            //                            return
+                            //                        }
+                            //                        if self.player.timeControlStatus == .playing {
+                            //                            self.isPlaying = true
+                            //                            self.eventSink?(["event" : "play"])
+                            //                        }
+                            return
+                        }
+                        
+                        if self.player.timeControlStatus == .paused {
+                            self.lastAvPlayerTimeControlStatus = self.player.timeControlStatus
+                            self.isPlaying=false
+                            self.eventSink?(["event" : "pause"])
+                            
+                            return
+                            
+                        }
+                        if self.player.timeControlStatus == .playing {
+                            self.lastAvPlayerTimeControlStatus = self.player.timeControlStatus
+                            self.isPlaying = true
+                            self.eventSink?(["event" : "play"])
+                            
+                        }
+                    }
+                }
+                let currentItem = self.player.currentItem
+                
+                let currentTime = currentItem?.currentTime() ?? .zero
+                let duration = currentItem?.duration ?? .zero
+                
+                
+                
+                if self.player.rate == 0 && //if player rate dropped to 0
+                    ///TODO  这里需要修改
+                    currentTime > .zero &&
+                    currentTime < duration &&
+                    //CMTIME_COMPARE_INLINE(_player.currentItem.currentTime, >, kCMTimeZero) && //if video was started
+                    //CMTIME_COMPARE_INLINE(_player.currentItem.currentTime, <, _player.currentItem.duration) && //but not yet finished
+                    self.wasPlaying { //instance variable to handle overall state (changed to YES when user triggers playback)
+                    self.handleStalled()
+                }
             }
             
-            else if context! == statusContext {
-                let item = object as! AVPlayerItem
-                switch item.status {
-                case .failed:
-                    print("Failed to load video:")
-                    print(item.error.debugDescription)
-                    self.eventSink?(FlutterError(code: "VideoError", message: "Failed to load video:\(item.error?.localizedDescription)", details: nil))
-                    break
-                case .unknown:
-                    break
-                case .readyToPlay:
+            let context = context
+            if context != nil{
+                if(context! == timeRangeContext && object is AVPlayerItem){
+                    if self.eventSink != nil {
+                        var values = [[Int64]]()
+                        (object as! AVPlayerItem).loadedTimeRanges.forEach { rangeValue in
+                            let range = rangeValue.timeRangeValue
+                            let start = PipFlutterTimeUtils.timeToMillis(range.start)
+                            var end = start + PipFlutterTimeUtils.timeToMillis(range.duration)
+                            if CMTIME_IS_VALID(self.player.currentItem!.forwardPlaybackEndTime){
+                                let endTime = PipFlutterTimeUtils.timeToMillis(self.player.currentItem!.forwardPlaybackEndTime)
+                                if end > endTime {
+                                    end = endTime
+                                }
+                            }
+                            values.append([start,end])
+                        }
+                        self.eventSink!(["event" : "bufferingUpdate", "values" : values, "key" : self.key as Any])
+                    }
+                } else if context! == presentationSizeContext {
                     self.onReadyToPlay()
-                    break
-                @unknown default:
-                    break
                 }
-            } else if context! == playbackLikelyToKeepUpContext {
-                if self.player.currentItem?.isPlaybackLikelyToKeepUp == true {
-                    self.updatePlayingState()
+                
+                else if context! == statusContext {
+                    let item = object as! AVPlayerItem
+                    switch item.status {
+                    case .failed:
+                        print("Failed to load video:")
+                        print(item.error.debugDescription)
+                        self.eventSink?(FlutterError(code: "VideoError", message: "Failed to load video:\(item.error?.localizedDescription)", details: nil))
+                        break
+                    case .unknown:
+                        break
+                    case .readyToPlay:
+                        self.onReadyToPlay()
+                        break
+                    @unknown default:
+                        break
+                    }
+                } else if context! == playbackLikelyToKeepUpContext {
+                    if self.player.currentItem?.isPlaybackLikelyToKeepUp == true {
+                        self.updatePlayingState()
+                        self.eventSink?(["event" : "bufferingEnd", "key" : self.key])
+                    }
+                } else if context! == playbackBufferEmptyContext {
+                    self.eventSink?(["event" : "bufferingStart", "key" : self.key])
+                } else if context! == playbackBufferFullContext {
                     self.eventSink?(["event" : "bufferingEnd", "key" : self.key])
                 }
-            } else if context! == playbackBufferEmptyContext {
-                self.eventSink?(["event" : "bufferingStart", "key" : self.key])
-            } else if context! == playbackBufferFullContext {
-                self.eventSink?(["event" : "bufferingEnd", "key" : self.key])
             }
         }
+        
         
     }
     
@@ -534,7 +537,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             self.addObservers(item: self.player.currentItem)
         }
         
-        if self.isPlaying {
+        if self.wasPlaying {
             if #available(iOS 10.0, *) {
                 self.player.playImmediately(atRate: 1.0)
                 self.player.rate = self.playerRate
@@ -602,6 +605,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         self.isStalledCheckStarted = false
         self.isPlaying = true
         self.updatePlayingState()
+        
     }
     
     func pause() {
@@ -610,8 +614,8 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     }
     
     func position() -> Int64 {
-        let millis = PipFlutterTimeUtils.timeToMillis(self.player.currentTime() )
-        print("_applyPlayPause position  \(millis)  =====  PipFlutterTimeUtils.timeToMillis")
+        let  time =  self.player.currentItem?.currentTime() ?? .zero
+        let millis = PipFlutterTimeUtils.timeToMillis(time)
         return millis
     }
     
@@ -638,24 +642,30 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         return PipFlutterTimeUtils.timeToMillis(time)
     }
     
+    var wasPlaying: Bool{
+        get{
+            var wasPlaying = self.isPlaying
+            if !wasPlaying{
+                wasPlaying =  self.player.timeControlStatus == .playing || self.player.timeControlStatus == .waitingToPlayAtSpecifiedRate
+            }
+            return wasPlaying
+        }
+    }
     func seekTo(location:Int) {
         ///When player is playing, pause video, seek to new position and start again. This will prevent issues with seekbar jumps.
-        let wasPlaying = self.isPlaying
+        let wasPlaying = wasPlaying
         if wasPlaying {
             self.player.pause()
         }
-        DispatchQueue.main.async {
-            self.player.currentItem?.seek(to: CMTimeMake(value: Int64(location), timescale: 1000),
-                             toleranceBefore:CMTime.zero,
-                             toleranceAfter:CMTime.zero,
-                             completionHandler:{ (finished:Bool) in
-                if wasPlaying {
-                    self.player.rate = self.playerRate
-                    self.player.play()
-                }
-            })
-        }
-        
+        self.player.currentItem?.seek(to: CMTimeMake(value: Int64(location), timescale: 1000),
+                         toleranceBefore:CMTime.zero,
+                         toleranceAfter:CMTime.zero,
+                         completionHandler:{ (finished:Bool) in
+            if wasPlaying {
+                self.player.rate = self.playerRate
+                self.player.play()
+            }
+        })
     }
     
     // `setIsLooping:` has moved as a setter.
@@ -688,7 +698,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             }
         }
         
-        if self.isPlaying {
+        if self.wasPlaying {
             self.player.rate = self.playerRate
         }
     }
@@ -778,13 +788,11 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     
     
     func usePlayerLayer(frame:CGRect) {
-        print("setPictureInPicture pictureInPicture : usePlayerLayer\(frame) \(self.playerLayer)")
         if (self.playerLayer == nil) {
             return
         }
         self.playerLayer!.isHidden=false
-        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(200), execute:
-                                        {
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(200), execute:{
             self.setPictureInPicture(pictureInPicture: true)
         })
     }
@@ -794,10 +802,6 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         self.eventSink?(["event" : "pipStop"])
     }
     func disablePictureInPicture() {
-        
-        //        self.playerLayer?.removeFromSuperlayer()
-        //        self.playerLayer = nil
-        //        self.setPictureInPicture(pictureInPicture: false)
         self.mPictureInPicture = false
         self.playerToGoPipFlag=true
         if (self.pipController != nil) {

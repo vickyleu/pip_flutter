@@ -223,10 +223,12 @@ class _ProgressBarPainter extends CustomPainter {
         playedPartPercent > 1 ? size.width : playedPartPercent * size.width;
 
 
-    value.buffered.sort((a, b) => a.start.compareTo(b.start)); // 先按照开始时间排序
+    final List<DurationRange> copyBuffered = List.empty(growable: true);
+    copyBuffered.addAll(value.buffered);
+    copyBuffered.sort((a, b) => a.start.compareTo(b.start)); // 先按照开始时间排序
 
     List<DurationRange> bufferedRanges = [];
-    bufferedRanges.addAll(value.buffered);
+    bufferedRanges.addAll(copyBuffered);
     // 合并和拆分范围
     List<DurationRange> finalRanges = [];
     if(bufferedRanges.isNotEmpty){

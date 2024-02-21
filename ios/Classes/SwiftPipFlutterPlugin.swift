@@ -549,6 +549,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 self.setupRemoteNotification(player)
                 player.play()
                 self.initAspect()
+               
                 result(nil)
                 break
             case "position":
@@ -562,38 +563,51 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 }
                 break
             case "seekTo":
-                player.seekTo(location: argsMap["location"] as! Int)
-                result(nil)
+                DispatchQueue.main.async {
+                    player.seekTo(location: argsMap["location"] as! Int)
+                    result(nil)
+                }
                 break
             case "pause":
-                player.pause()
-                result(nil)
+                DispatchQueue.main.async {
+                    player.pause()
+                    result(nil)
+                }
                 break
             case "setSpeed":
-                player.setSpeed(argsMap["speed"] as! Double, result:result)
+                DispatchQueue.main.async {
+                    player.setSpeed(argsMap["speed"] as! Double, result:result)
+                    result(nil)
+                }
                 break
             case "setTrackParameters":
                 let width = argsMap["width"] as! Int
                 let height = argsMap["height"] as! Int
                 let bitrate = argsMap["bitrate"] as! Int
-                player.setTrackParameters(width, height, bitrate)
-                result(nil)
+                DispatchQueue.main.async {
+                    player.setTrackParameters(width, height, bitrate)
+                    result(nil)
+                }
                 break
             case "enablePictureInPicture":
                 let left = argsMap["left"] as! Double
                 let top = argsMap["top"] as! Double
                 let width = argsMap["width"] as! Double
                 let height = argsMap["height"] as! Double
-                player.enablePictureInPicture(frame: CGRect.init(x: left, y: top, width: width, height: height))
-                result(nil)
+                DispatchQueue.main.async {
+                    player.enablePictureInPicture(frame: CGRect.init(x: left, y: top, width: width, height: height))
+                    result(nil)
+                }
                 break
             case "enablePictureInPictureFrame":
                 let left = argsMap["left"] as! Double
                 let top = argsMap["top"] as! Double
                 let width = argsMap["width"] as! Double
                 let height = argsMap["height"] as! Double
-                player.playerLayerSetup(frame: CGRect.init(x: left, y: top, width: width, height: height))
-                result(nil)
+                DispatchQueue.main.async {
+                    player.playerLayerSetup(frame: CGRect.init(x: left, y: top, width: width, height: height))
+                    result(nil)
+                }
                 break
             case "isPictureInPictureSupported":
                 if #available(iOS 9.0, *) {
@@ -605,11 +619,13 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 result(false)
                 break
             case "disablePictureInPicture":
-                player.disablePictureInPictureNoAction()
-                result(nil)
-                DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(1500)) {
-                    [weak player] in
-                    player?.disablePictureInPicture()
+                DispatchQueue.main.async {
+                    player.disablePictureInPictureNoAction()
+                    result(nil)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(1500)) {
+                        [weak player] in
+                        player?.disablePictureInPicture()
+                    }
                 }
 //                DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + .milliseconds(1500), execute: {
 ////                DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + .milliseconds(1500), execute: {
