@@ -423,6 +423,7 @@ class _PipFlutterPlayerCupertinoControlsState
   GestureDetector _buildPlayPause(VideoPlayerController controller,
       Color iconColor,
       double barHeight,) {
+    print("controller.value.isPlaying::::${(controller.value.isPlaying||controller.value.isBuffering)?"在播放":"暂停了"}");
     return GestureDetector(
       onTap: _onPlayPause,
       child: Container(
@@ -430,7 +431,7 @@ class _PipFlutterPlayerCupertinoControlsState
         color: Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 6),
         child: Icon(
-          controller.value.isPlaying
+          (controller.value.isPlaying||controller.value.isBuffering)
               ? _controlsConfiguration.pauseIcon
               : _controlsConfiguration.playIcon,
           color: iconColor,
