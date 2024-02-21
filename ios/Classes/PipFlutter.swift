@@ -133,7 +133,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
                              options:.new,
                              context:playbackBufferFullContext)
             NotificationCenter.default.addObserver(self,
-                                                   selector:Selector("itemDidPlayToEndTime:"),
+                                                   selector:#selector(self.itemDidPlayToEndTime(_:)),
                                                    name:NSNotification.Name.AVPlayerItemDidPlayToEndTime,
                                                    object:item)
             self.observersAdded = true
@@ -279,18 +279,19 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         if useCache {
             item = cacheManager.getCachingPlayerItemForNormalPlayback(url, cacheKey:cacheKey, videoExtension: videoExtension, headers:headers!)
         } else {
-            let urlSpecial = url.specialSchemeURL
+            let urlSpecial = url//.specialSchemeURL
             
             let asset:AVURLAsset! = AVURLAsset(url: urlSpecial, options:["AVURLAssetHTTPHeaderFieldsKey" : headers as Any])
             if certificateUrl != nil && certificateUrl!.lengthOfBytes(using: .utf8) > 0 {
                 self.loaderDelegate =   PipFlutterEzDrmAssetsLoaderDelegate.init(URL.init(string: certificateUrl!)!, URL.init(string: licenseUrl!)!)
                 //            dispatch_queue_attr_t qos = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INTERACTIVE, -1);
-                let streamQueue = DispatchQueue.init(label: "streamQueue")
-                asset.resourceLoader.setDelegate(self.loaderDelegate, queue: streamQueue)
-                print("url====>setDelegate>>>\(urlSpecial)")
+               
             }else{
-//                 self.loaderDelegate =   PipFlutterEzDrmAssetsLoaderDelegate.init()
+                 self.loaderDelegate =   PipFlutterEzDrmAssetsLoaderDelegate.init()
             }
+            let streamQueue = DispatchQueue.init(label: "streamQueue")
+            asset.resourceLoader.setDelegate(self.loaderDelegate, queue: streamQueue)
+            print("url====>setDelegate>>>\(urlSpecial)")
             item = AVPlayerItem(asset: asset)
         }
         
@@ -379,11 +380,11 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
                 return
             }
             
-            if(self.stalledCount<3){
+            if(self.stalledCount<2){
                 if let currentTime = self.player.currentItem?.currentTime() {
                     let second = CMTimeGetSeconds(currentTime)
                     
-                    self.seekTo(location: Int(second*1000)+10 )
+                    self.seekTo(location: Int(second*1000)+100 )
                 }
             }
             

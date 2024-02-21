@@ -636,6 +636,7 @@ class PipFlutterPlayerController {
   ///Initializes video based on configuration. Invoke actions which need to be
   ///run on player start.
   Future _initializeVideo() async {
+
     setLooping(pipFlutterPlayerConfiguration.looping);
     _videoEventStreamSubscription?.cancel();
     _videoEventStreamSubscription = null;
@@ -647,7 +648,6 @@ class PipFlutterPlayerController {
     final fullScreenByDefault =
         pipFlutterPlayerConfiguration.fullScreenByDefault;
     if (pipFlutterPlayerConfiguration.autoPlay) {
-      print("自动播放打开了???");
       if (fullScreenByDefault && !isFullScreen) {
         enterFullScreen();
       }
@@ -860,7 +860,7 @@ class PipFlutterPlayerController {
     // print("统计回放播放时长 _onVideoPlayerChanged ");
     final VideoPlayerValue currentVideoPlayerValue =
         videoPlayerController?.value ??
-            VideoPlayerValue(duration: const Duration());
+            VideoPlayerValue(duration: const Duration(),alreadyBuffered: List.empty(growable: true));
 
     if (currentVideoPlayerValue.hasError) {
       _videoPlayerValueOnError ??= currentVideoPlayerValue;
@@ -1020,8 +1020,9 @@ class PipFlutterPlayerController {
 
     videoPlayerController!
         .setTrackParameters(track.width, track.height, track.bitrate).then((value){
-
-      videoPlayerController!.play();
+          if(pipFlutterPlayerConfiguration.autoPlay){
+            videoPlayerController!.play();
+          }
       videoPlayerController!.refresh();
     });
     _pipFlutterPlayerAsmsTrack = track;
@@ -1049,8 +1050,8 @@ class PipFlutterPlayerController {
     }
     _postEvent(PipFlutterPlayerEvent(
         PipFlutterPlayerEventType.changedPlayerVisibility));
-
     if (_isAutomaticPlayPauseHandled()) {
+      print("自动播放没打开了???");
       if (pipFlutterPlayerConfiguration.playerVisibilityChangedBehavior !=
           null) {
         pipFlutterPlayerConfiguration

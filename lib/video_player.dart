@@ -19,6 +19,7 @@ class VideoPlayerValue {
   /// rest will initialize with default values when unset.
   VideoPlayerValue({
     required this.duration,
+    required  this.alreadyBuffered,
     this.size,
     this.position = const Duration(),
     this.absolutePosition,
@@ -33,12 +34,12 @@ class VideoPlayerValue {
   });
 
   /// Returns an instance with a `null` [Duration].
-  VideoPlayerValue.uninitialized() : this(duration: null);
+  VideoPlayerValue.uninitialized() : this(duration: null,alreadyBuffered: List.empty(growable: true));
 
   /// Returns an instance with a `null` [Duration] and the given
   /// [errorDescription].
   VideoPlayerValue.erroneous(String errorDescription)
-      : this(duration: null, errorDescription: errorDescription);
+      : this(duration: null, errorDescription: errorDescription,alreadyBuffered: List.empty(growable: true));
 
   /// The total duration of the video.
   ///
@@ -55,6 +56,12 @@ class VideoPlayerValue {
 
   /// The currently buffered ranges.
   final List<DurationRange> buffered;
+
+
+  final List<DurationRange> alreadyBuffered;
+
+
+
 
   /// True if the video is playing. False if it's paused.
   final bool isPlaying;
@@ -133,6 +140,7 @@ class VideoPlayerValue {
       speed: speed ?? this.speed,
       errorDescription: errorDescription ?? this.errorDescription,
       isPip: isPip ?? this.isPip,
+      alreadyBuffered: alreadyBuffered,
     );
   }
 
@@ -178,7 +186,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     this.pipFrameCallback,
     this.pipInBackgroundCallback,
     bool autoCreate = true,
-  }) : super(VideoPlayerValue(duration: null)) {
+  }) : super(VideoPlayerValue(duration: null,alreadyBuffered: List.empty(growable: true))) {
     if (autoCreate) {
       _create();
     }
@@ -423,7 +431,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     value = VideoPlayerValue(
       duration: null,
       isLooping: value.isLooping,
-      volume: value.volume,
+      volume: value.volume,alreadyBuffered: List.empty(growable: true)
     );
 
     if (!_creatingCompleter.isCompleted) await _creatingCompleter.future;

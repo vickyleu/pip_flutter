@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:pip_flutter/pipflutter_player_controller.dart';
@@ -221,21 +222,47 @@ class _PipFlutterPlayerCupertinoControlsState
                       } else {
                         yield const SizedBox();
                       }
-                      if (_controlsConfiguration.enableProgressText) {
-                        yield _buildPosition();
-                      } else {
-                        yield const SizedBox();
-                      }
-                      if (_controlsConfiguration.enableProgressBar) {
-                        yield _buildProgressBar();
-                      } else {
-                        yield const SizedBox();
-                      }
-                      if (_controlsConfiguration.enableProgressText) {
-                        yield _buildRemaining();
-                      } else {
-                        yield const SizedBox();
-                      }
+                      yield Expanded(
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              return Container(
+                                width: constraints.maxWidth,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: ()sync*{
+
+                                    if (_controlsConfiguration.enableProgressText) {
+                                      yield Container(child: _buildPosition(),
+                                       padding: EdgeInsets.only(right: (_pipFlutterPlayerController!.isFullScreen?12:12)),
+                                       width:constraints.maxWidth*
+                                           (_pipFlutterPlayerController!.isFullScreen?0.10:0.22),
+                                      );
+                                      // yield ;
+                                    } else {
+                                      yield const SizedBox();
+                                    }
+                                    if (_controlsConfiguration.enableProgressBar) {
+                                      yield Expanded(child: _buildProgressBar());
+                                      // yield ;
+                                    } else {
+                                      yield const SizedBox();
+                                    }
+                                    if (_controlsConfiguration.enableProgressText) {
+                                      yield Container(child: _buildRemaining(),
+                                        padding: EdgeInsets.only(right: (_pipFlutterPlayerController!.isFullScreen?12:5)),
+                                        width:constraints.maxWidth*
+                                            (_pipFlutterPlayerController!.isFullScreen?0.10:0.22),
+                                      );
+                                      // yield ;
+                                    } else {
+                                      yield const SizedBox();
+                                    }
+                                  }().toList(),
+                                ),
+                              );
+                            },
+                          )
+                      );
                     }()
                         .toList(),
                   ),
@@ -422,10 +449,11 @@ class _PipFlutterPlayerCupertinoControlsState
     ) :
     const Duration();
 
-    return Padding(
-      padding: const EdgeInsets.only(right: 12.0),
-      child: Text(
+    return Center(
+      child: AutoSizeText(
         PipFlutterPlayerUtils.formatDuration(position),
+        maxLines: 1,
+        minFontSize: 7,
         style: TextStyle(
           color: _controlsConfiguration.textColor,
           fontSize: 12.0,
@@ -439,10 +467,11 @@ class _PipFlutterPlayerCupertinoControlsState
         ? ((_latestValue!.position>_latestValue!.duration!)?(const Duration()):(_latestValue!.duration! - _latestValue!.position))
         : const Duration();
 
-    return Padding(
-      padding: const EdgeInsets.only(right: 12.0),
-      child: Text(
+    return Center(
+      child: AutoSizeText(
         '-${PipFlutterPlayerUtils.formatDuration(position)}',
+        maxLines: 1,
+        minFontSize: 7,
         style:
         TextStyle(color: _controlsConfiguration.textColor, fontSize: 12.0),
       ),
@@ -635,7 +664,7 @@ class _PipFlutterPlayerCupertinoControlsState
   }
 
   Widget _buildProgressBar() {
-    return Expanded(
+    return Container(
       child: Padding(
         padding: const EdgeInsets.only(right: 12.0),
         child: PipFlutterPlayerCupertinoVideoProgressBar(
@@ -660,6 +689,7 @@ class _PipFlutterPlayerCupertinoControlsState
               _controlsConfiguration.progressBarBackgroundColor),
         ),
       ),
+      // color: Colors.blue,
     );
   }
 

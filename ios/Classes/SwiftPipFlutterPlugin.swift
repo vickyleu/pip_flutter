@@ -443,7 +443,10 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         default:
             let argsMap = call.arguments as! Dictionary<String,AnyObject>
             let textureId = argsMap["textureId"] as! Int
-            let player = self.players[textureId]!
+            guard let player = self.players[textureId] else{
+                result(nil)
+                return
+            }
             switch call.method{
             case "setDataSource":
                 player.clear()

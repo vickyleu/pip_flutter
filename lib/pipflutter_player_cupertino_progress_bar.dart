@@ -148,12 +148,13 @@ class _VideoProgressBarState
     _updateBlockTimer?.cancel();
     _updateBlockTimer = null;
   }
-
   VideoPlayerValue _getValue() {
     if (lastSeek != null) {
-      return controller!.value.copyWith(position: lastSeek);
+      final value= controller!.value.copyWith(position: lastSeek);
+      return value;
     } else {
-      return controller!.value;
+      final value= controller!.value;
+      return value;
     }
   }
 
@@ -196,6 +197,7 @@ class _ProgressBarPainter extends CustomPainter {
     return true;
   }
 
+
   @override
   void paint(Canvas canvas, Size size) {
     const barHeight = 5.0;
@@ -219,9 +221,62 @@ class _ProgressBarPainter extends CustomPainter {
         value.position.inMilliseconds / value.duration!.inMilliseconds;
     final double playedPart =
         playedPartPercent > 1 ? size.width : playedPartPercent * size.width;
-    for (final DurationRange range in value.buffered) {
+
+
+    value.buffered.sort((a, b) => a.start.compareTo(b.start)); // 先按照开始时间排序
+
+    List<DurationRange> bufferedRanges = [];
+    bufferedRanges.addAll(value.buffered);
+    // 合并和拆分范围
+    List<DurationRange> finalRanges = [];
+    if(bufferedRanges.isNotEmpty){
+      // 定义一个方法用于合并两个范围
+      DurationRange currentRange = bufferedRanges[0];
+      for (int i = 1; i < bufferedRanges.length; i++) {
+        DurationRange nextRange = bufferedRanges[i];
+        if (currentRange.end.inSeconds >= nextRange.start.inSeconds) {
+          // 范围重叠，合并
+          currentRange = currentRange.merge(nextRange);
+        } else {
+          // 范围不重叠，保存当前范围并开始新的范围
+          finalRanges.add(currentRange);
+          currentRange = nextRange;
+        }
+      }
+      finalRanges.add(currentRange);
+    }
+
+    // 更新缓存范围的方法
+    void updateBufferedRanges(List<DurationRange> finalRanges) {
+      // 如果 _buffered 为空，直接将 finalRanges 复制到 _buffered
+      if (value.alreadyBuffered.isEmpty) {
+        value.alreadyBuffered.addAll(finalRanges);
+        return;
+      }
+
+      // 否则，将 finalRanges 与 _buffered 最后一个范围合并
+      DurationRange lastMergedRange = value.alreadyBuffered.removeLast();
+      DurationRange firstNewRange = finalRanges.first;
+
+      if (lastMergedRange.end.inSeconds >= firstNewRange.start.inSeconds) {
+        // 范围重叠，合并
+        finalRanges[0] = lastMergedRange.merge(firstNewRange);
+      } else {
+        // 范围不重叠，直接添加到 _buffered
+        value.alreadyBuffered.add(lastMergedRange);
+      }
+      // 将剩余的 finalRanges 添加到 _buffered
+      value.alreadyBuffered.addAll(finalRanges);
+    }
+    updateBufferedRanges(finalRanges);
+    print("alreadyBuffered.length=${value.alreadyBuffered.length}");
+
+    for (int i = 0; i < value.alreadyBuffered.length; i++) {
+      DurationRange range = value.alreadyBuffered[i];
       final double start = range.startFraction(value.duration!) * size.width;
       final double end = range.endFraction(value.duration!) * size.width;
+      print("start: $start, end: $end, playedPart: $playedPart");
+      print("查询缓存时间 i=$i range:${range.start.inSeconds}==${range.end.inSeconds}");
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromPoints(
@@ -254,6 +309,23 @@ class _ProgressBarPainter extends CustomPainter {
       Offset(playedPart, baseOffset + barHeight / 2),
       handleHeight,
       colors.handlePaint,
+    );
+  }
+}
+
+extension _D on DurationRange{
+  DurationRange merge(DurationRange other) {
+    return DurationRange(
+      Duration(
+        seconds: start.inSeconds < other.start.inSeconds
+            ? start.inSeconds
+            : other.start.inSeconds,
+      ),
+      Duration(
+        seconds: end.inSeconds > other.end.inSeconds
+            ? end.inSeconds
+            : other.end.inSeconds,
+      ),
     );
   }
 }
