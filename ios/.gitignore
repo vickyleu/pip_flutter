@@ -2,7 +2,7 @@
 .vagrant/
 .sconsign.dblite
 .svn/
-
+**/*.lock
 .DS_Store
 *.swp
 profile
