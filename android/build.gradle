@@ -27,14 +27,14 @@ apply plugin: 'kotlin-android'
 
 android {
 
-    ext.exoPlayerVersion = "2.18.2"
-    ext.lifecycleVersion = "2.6.0-alpha03"
+    ext.exoPlayerVersion = "2.19.1"
+    ext.lifecycleVersion = "2.7.0"
     ext.annotationVersion = "1.5.0"
-    ext.workVersion = "2.7.1"
-    ext.gradleVersion = "4.1.0"
-    ext.kotlinVersion = "1.5.31"
+    ext.workVersion = "2.9.0"
+    ext.gradleVersion = "8.2.2"
+    ext.kotlinVersion = "1.9.22"
 
-    compileSdkVersion 33
+    compileSdk 33
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -55,12 +55,20 @@ android {
     }
 
     dependencies {
+        implementation "com.google.android.exoplayer:exoplayer-common:$exoPlayerVersion"
         implementation "com.google.android.exoplayer:exoplayer-core:$exoPlayerVersion"
         implementation "com.google.android.exoplayer:exoplayer-hls:$exoPlayerVersion"
         implementation "com.google.android.exoplayer:exoplayer-dash:$exoPlayerVersion"
         implementation "com.google.android.exoplayer:exoplayer-smoothstreaming:$exoPlayerVersion"
         implementation "com.google.android.exoplayer:exoplayer-ui:$exoPlayerVersion"
         implementation "com.google.android.exoplayer:extension-mediasession:$exoPlayerVersion"
+        implementation "com.google.android.exoplayer:exoplayer-decoder:$exoPlayerVersion"
+        implementation "com.google.android.exoplayer:exoplayer-transformer:$exoPlayerVersion"
+        implementation "com.google.android.exoplayer:exoplayer-extractor:$exoPlayerVersion"
+        implementation "com.google.android.exoplayer:exoplayer-datasource:$exoPlayerVersion"
+        implementation "com.google.android.exoplayer:exoplayer-rtsp:$exoPlayerVersion"
+
+
         implementation "androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion"
         implementation "androidx.lifecycle:lifecycle-common:$lifecycleVersion"
         implementation "androidx.lifecycle:lifecycle-common-java8:$lifecycleVersion"

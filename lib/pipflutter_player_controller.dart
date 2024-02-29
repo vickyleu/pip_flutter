@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:collection/collection.dart' show IterableExtension;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pip_flutter/pipflutter_player_asms_audio_track.dart';
 import 'package:pip_flutter/pipflutter_player_asms_data_holder.dart';
@@ -233,6 +234,8 @@ class PipFlutterPlayerController {
   VideoPipLifeCycleCallback? pipLifeCycleCallback;
   VideoPipFrameCallback? pipFrameCallback;
   VideoPipInBackgroundCallback? pipInBackgroundCallback;
+
+
 
   PipFlutterPlayerController(
     this.pipFlutterPlayerConfiguration, {
@@ -567,7 +570,7 @@ class PipFlutterPlayerController {
         if (!file.existsSync()) {
           PipFlutterPlayerUtils.log(
               "File ${file.path} doesn't exists. This may be because "
-              "you're acessing file from native path and Flutter doesn't "
+              "you're accessing file from native path and Flutter doesn't "
               "recognize this path.");
         }
         await videoPlayerController?.setFileDataSource(
@@ -675,7 +678,7 @@ class PipFlutterPlayerController {
 
   ///Method which is invoked when full screen changes.
   Future<void> _onFullScreenStateChanged() async {
-    if ((videoPlayerController?.value.isPlaying == true ||videoPlayerController?.value.isBuffering == true) && !_isFullScreen) {
+    if ((videoPlayerController?.value.isPlaying == true ||videoPlayerController?.value.isBuffering == true ) && !_isFullScreen) { //
       enterFullScreen();
       videoPlayerController?.removeListener(_onFullScreenStateChanged);
     }
@@ -683,7 +686,6 @@ class PipFlutterPlayerController {
 
   ///Enables full screen mode in player. This will trigger route change.
   void enterFullScreen() {
-    print("enterFullScreen called");
     _isFullScreen = true;
     _postControllerEvent(PipFlutterPlayerControllerEvent.openFullscreen);
   }
@@ -857,10 +859,9 @@ class PipFlutterPlayerController {
 
   ///Listener used to handle video player changes.
   void _onVideoPlayerChanged() async {
-    // print("统计回放播放时长 _onVideoPlayerChanged ");
     final VideoPlayerValue currentVideoPlayerValue =
         videoPlayerController?.value ??
-            VideoPlayerValue(duration: const Duration(),alreadyBuffered: List.empty(growable: true));
+            VideoPlayerValue(duration: const Duration());
 
     if (currentVideoPlayerValue.hasError) {
       _videoPlayerValueOnError ??= currentVideoPlayerValue;
@@ -884,7 +885,6 @@ class PipFlutterPlayerController {
     else if (_wasInPipMode) {
       _postEvent(PipFlutterPlayerEvent(PipFlutterPlayerEventType.pipStop));
       _wasInPipMode = false;
-      print("_wasInFullScreenBeforePiP exitFullScreen ${_wasInFullScreenBeforePiP}");
       if(Platform.isAndroid){
         if (!_wasInFullScreenBeforePiP) {
           exitFullScreen();
@@ -908,7 +908,7 @@ class PipFlutterPlayerController {
     if (now - _lastPositionSelection > 500) {
       _lastPositionSelection = now;
 
-      if(currentVideoPlayerValue.isPlaying || currentVideoPlayerValue.isBuffering){
+      if(currentVideoPlayerValue.isPlaying ){ //|| currentVideoPlayerValue.isBuffering
         _postEvent(
           PipFlutterPlayerEvent(
             PipFlutterPlayerEventType.progress,
@@ -1051,7 +1051,6 @@ class PipFlutterPlayerController {
     _postEvent(PipFlutterPlayerEvent(
         PipFlutterPlayerEventType.changedPlayerVisibility));
     if (_isAutomaticPlayPauseHandled()) {
-      print("自动播放没打开了???");
       if (pipFlutterPlayerConfiguration.playerVisibilityChangedBehavior !=
           null) {
         pipFlutterPlayerConfiguration
@@ -1237,7 +1236,7 @@ class PipFlutterPlayerController {
       final Offset position = renderBox.localToGlobal(Offset.zero);
 
       if (Platform.isAndroid || Platform.isIOS) {
-        return videoPlayerController?.enablePictureInPictureFrame(
+        await videoPlayerController?.enablePictureInPictureFrame(
           left: position.dx,
           top: position.dy,
           width: renderBox.size.width,
@@ -1266,7 +1265,7 @@ class PipFlutterPlayerController {
     }
     // setControlsEnabled(true);
     videoPlayerController!.refresh();
-    return videoPlayerController!.disablePictureInPicture();
+    return videoPlayerController!.disablePictureInPicture(_isFullScreen);
   }
 
   // ignore: use_setters_to_change_properties

@@ -10,6 +10,10 @@ import AVKit
 import AVFoundation
 
 class PipFlutterView : UIView {
+    
+    
+
+    
     var player:AVPlayer!{
         get{self.playerLayer.player}
         set{
@@ -19,13 +23,16 @@ class PipFlutterView : UIView {
     }
     var playerLayer:AVPlayerLayer
     {
-        get{(self.layer as! AVPlayerLayer)}
+        get{
+            (self.layer as! AVPlayerLayer)
+        }
     }
-
+    
     // Override UIView method
     override class var layerClass: AnyClass{
         return AVPlayerLayer.self
     }
-
+    
+    
     
 }

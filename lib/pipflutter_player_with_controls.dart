@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:pip_flutter/pipflutter_player_controller.dart';
@@ -241,10 +242,12 @@ class _PipFlutterPlayerVideoFitWidgetState
       widget.pipFlutterPlayerController.videoPlayerController;
 
   bool _initialized = false;
+  List<int> _thumbnailImage = List.empty(growable: true);
 
   VoidCallback? _initializedListener;
 
   bool _started = false;
+  bool _isPlayed = false;
 
   StreamSubscription? _controllerEventSubscription;
 
@@ -285,6 +288,9 @@ class _PipFlutterPlayerVideoFitWidgetState
         if (_initialized != controller!.value.initialized) {
           _initialized = controller!.value.initialized;
           setState(() {});
+        }else if(_thumbnailImage != controller!.value.image){
+          _thumbnailImage = controller!.value.image;
+          setState(() {});
         }
       };
       controller!.addListener(_initializedListener!);
@@ -295,6 +301,7 @@ class _PipFlutterPlayerVideoFitWidgetState
     _controllerEventSubscription =
         widget.pipFlutterPlayerController.controllerEventStream.listen((event) {
           if (event == PipFlutterPlayerControllerEvent.play) {
+            _isPlayed= true;
             if (!_started) {
               setState(() {
                 _started =
@@ -304,6 +311,7 @@ class _PipFlutterPlayerVideoFitWidgetState
             }
           }
           if (event == PipFlutterPlayerControllerEvent.setupDataSource) {
+            _isPlayed= false;
             setState(() {
               _started = false;
             });
@@ -313,7 +321,8 @@ class _PipFlutterPlayerVideoFitWidgetState
 
   @override
   Widget build(BuildContext context) {
-    if (_initialized && _started) {
+    //&& _started
+    if (_initialized) {
       return Center(
         child: ClipRect(
           child: Container(
@@ -324,12 +333,26 @@ class _PipFlutterPlayerVideoFitWidgetState
               child: SizedBox(
                 width: controller!.value.size?.width ?? 0,
                 height: controller!.value.size?.height ?? 0,
-                child: VideoPlayer(controller),
+                child: Stack(
+                  children: ()sync*{
+                    if(_started){
+                      yield Positioned.fill(child: VideoPlayer(controller));
+                    }
+                    if(_thumbnailImage.isNotEmpty && !_isPlayed){
+                      Uint8List uint8List = Uint8List.fromList(_thumbnailImage);
+                      yield Positioned.fill(child:
+                      Container(
+                        child: Image.memory(uint8List, fit: widget.boxFit,),
+                      ));
+                    }
+                  }().toList(),
+                ),
               ),
             ),
           ),
         ),
       );
+
     } else {
       return const SizedBox();
     }

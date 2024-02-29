@@ -140,7 +140,7 @@ internal class PipFlutterPlayer(
         val uri = Uri.parse(dataSource)
         var dataSourceFactory: DataSource.Factory
         val userAgent = getUserAgent(headers)
-        if (licenseUrl != null && licenseUrl.isNotEmpty()) {
+        if (!licenseUrl.isNullOrEmpty()) {
             val httpMediaDrmCallback =
                 HttpMediaDrmCallback(licenseUrl, DefaultHttpDataSource.Factory())
             if (drmHeaders != null) {
@@ -171,7 +171,7 @@ internal class PipFlutterPlayer(
                         .build(httpMediaDrmCallback)
                 }
             }
-        } else if (clearKey != null && clearKey.isNotEmpty()) {
+        } else if (!clearKey.isNullOrEmpty()) {
             drmSessionManager = if (Util.SDK_INT < 18) {
                 Log.e(TAG, "Protected content not supported on API levels below 18")
                 null

@@ -1,14 +1,18 @@
 import 'dart:async';
-import 'dart:ui';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:pip_flutter/pipflutter_player_buffering_configuration.dart';
+
 import 'method_channel_video_player.dart';
 
+typedef VideoPipLifeCycleCallback = void Function(bool isShouldOpenPip);
+typedef VideoPipFrameCallback = void Function();
+typedef VideoPipInBackgroundCallback = void Function(
+    int position, int duration);
 
-typedef VideoPipLifeCycleCallback= void Function(bool isShouldOpenPip);
-typedef VideoPipFrameCallback= void Function();
-typedef VideoPipInBackgroundCallback= void Function(int position,int duration);
 /// The interface that implementations of video_player must implement.
 ///
 /// Platform implementations should extend this class rather than implement it as `video_player`
@@ -25,29 +29,57 @@ abstract class VideoPlayerPlatform {
   @visibleForTesting
   bool get isMock => false;
 
-
   VideoPipLifeCycleCallback? _pipLifeCycleCallback;
   VideoPipFrameCallback? _pipFrameCallback;
   VideoPipInBackgroundCallback? _pipInBackgroundCallback;
 
+  MethodChannel? _methodChannel;
 
-
-  void setPipLifeCycleCallback(VideoPipLifeCycleCallback? pipLifeCycleCallback){
-    _pipLifeCycleCallback=pipLifeCycleCallback;
+  void setNativeLifeCycleCallback(bool isEnable) {
+    if (isEnable) {
+      _methodChannel ??=
+          (Platform.isIOS ? const MethodChannel("flutter_lifecycle") : null)
+            ?..setMethodCallHandler((call) async {
+              switch (call.method) {
+                case "viewDidLoad":
+                  break;
+                case "viewDidDisappear":
+                  viewDidDisappear();
+                  break;
+                case "viewDidLayoutSubviews":
+                  viewDidLayoutSubviews();
+                  break;
+                case "viewWillLayoutSubviews":
+                  viewWillLayoutSubviews();
+                  break;
+              }
+            });
+    } else {
+      _methodChannel?.setMethodCallHandler(null);
+      _methodChannel = null;
+    }
   }
-  void setPipFrameCallback(VideoPipFrameCallback? pipFrameCallback){
-    _pipFrameCallback=pipFrameCallback;
+
+  void setPipLifeCycleCallback(
+      VideoPipLifeCycleCallback? pipLifeCycleCallback) {
+    _pipLifeCycleCallback = pipLifeCycleCallback;
   }
-  void setPipInBackgroundCallback(VideoPipInBackgroundCallback? pipInBackgroundCallback){
-    _pipInBackgroundCallback=pipInBackgroundCallback;
+
+  void setPipFrameCallback(VideoPipFrameCallback? pipFrameCallback) {
+    _pipFrameCallback = pipFrameCallback;
   }
 
-  VideoPipLifeCycleCallback? get  pipLifeCycleCallback=>_pipLifeCycleCallback;
-  VideoPipFrameCallback? get  pipFrameCallback=>_pipFrameCallback;
-  VideoPipInBackgroundCallback? get  pipInBackgroundCallback=>_pipInBackgroundCallback;
+  void setPipInBackgroundCallback(
+      VideoPipInBackgroundCallback? pipInBackgroundCallback) {
+    _pipInBackgroundCallback = pipInBackgroundCallback;
+  }
 
+  VideoPipLifeCycleCallback? get pipLifeCycleCallback => _pipLifeCycleCallback;
 
+  VideoPipFrameCallback? get pipFrameCallback => _pipFrameCallback;
 
+  VideoPipInBackgroundCallback? get pipInBackgroundCallback =>
+      _pipInBackgroundCallback;
 
   static VideoPlayerPlatform _instance = MethodChannelVideoPlayer();
 
@@ -91,6 +123,21 @@ abstract class VideoPlayerPlatform {
   Future<int?> create(
       {PipFlutterPlayerBufferingConfiguration? bufferingConfiguration}) {
     throw UnimplementedError('create() has not been implemented.');
+  }
+
+  /// Creates an instance of a video player and returns its textureId.
+  Future<void> viewDidDisappear() {
+    throw UnimplementedError('viewDidDisappear() has not been implemented.');
+  }
+
+  Future<void> viewDidLayoutSubviews() {
+    throw UnimplementedError(
+        'viewDidLayoutSubviews() has not been implemented.');
+  }
+
+  Future<void> viewWillLayoutSubviews() {
+    throw UnimplementedError(
+        'viewDidLayoutSubviews() has not been implemented.');
   }
 
   /// Pre-caches a video.
@@ -165,16 +212,15 @@ abstract class VideoPlayerPlatform {
     throw UnimplementedError(
         'enablePictureInPicture() has not been implemented.');
   }
-  Future<void> enablePictureInPictureFrame(int? textureId, double? top, double? left,
-      double? width, double? height) {
+
+  Future<void> enablePictureInPictureFrame(int? textureId, double? top,
+      double? left, double? width, double? height) {
     throw UnimplementedError(
         'enablePictureInPicture() has not been implemented.');
   }
 
-
-
   ///Disables PiP mode.
-  Future<void> disablePictureInPicture(int? textureId) {
+  Future<void> disablePictureInPicture(int? textureId, bool isFullScreen) {
     throw UnimplementedError(
         'disablePictureInPicture() has not been implemented.');
   }
@@ -407,6 +453,7 @@ class VideoEvent {
     this.duration,
     this.size,
     this.buffered,
+    this.image,
     this.position,
   });
 
@@ -432,6 +479,8 @@ class VideoEvent {
   ///
   /// Only used if [eventType] is [VideoEventType.bufferingUpdate].
   final List<DurationRange>? buffered;
+
+  final List<int>? image;
 
   ///Seek position
   final Duration? position;
@@ -463,6 +512,7 @@ class VideoEvent {
 enum VideoEventType {
   /// The video has been initialized.
   initialized,
+  thumbnail,
 
   /// The playback has ended.
   completed,

@@ -319,7 +319,7 @@ class _PipFlutterPlayerCupertinoControlsState
   Expanded _buildHitArea() {
     return Expanded(
       child: GestureDetector(
-        onTap: _latestValue != null && (_latestValue!.isPlaying||_latestValue!.isBuffering)
+        onTap: _latestValue != null && (_latestValue!.isPlaying) // ||_latestValue!.isBuffering
             ? () {
           if (controlsNotVisible == true) {
             cancelAndRestartTimer();
@@ -430,7 +430,7 @@ class _PipFlutterPlayerCupertinoControlsState
         color: Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 6),
         child: Icon(
-          (controller.value.isPlaying||controller.value.isBuffering)
+          (controller.value.isPlaying) //||controller.value.isBuffering
               ? _controlsConfiguration.pauseIcon
               : _controlsConfiguration.playIcon,
           color: iconColor,
@@ -694,13 +694,13 @@ class _PipFlutterPlayerCupertinoControlsState
   }
 
   void _onPlayPause() {
+
     bool isFinished = false;
 
     if (_latestValue?.position != null && _latestValue?.duration != null) {
       isFinished = _latestValue!.position >= _latestValue!.duration!;
     }
-
-    if (_controller!.value.isPlaying || _controller!.value.isBuffering ) {
+    if (_controller!.value.isPlaying ) { // || _controller!.value.isBuffering
       changePlayerControlsNotVisible(false, 7);
       _hideTimer?.cancel();
       _pipFlutterPlayerController!.pause();

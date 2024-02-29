@@ -46,9 +46,7 @@ class PipTimer {
 
   // 开始计时
   void start({int? progress = null}) {
-    print("timer start");
     if (_eventName != TimerState.idle && _eventName != TimerState.pause) {
-      print("接收回调事件::::  timer start");
       return;
     }
     _eventName = TimerState.start;
@@ -60,8 +58,6 @@ class PipTimer {
       // Do something here
       _timeInterval++;
     });
-    print("接收回调事件:::: onEventChanged timer add");
-
     if (progress != null) {
       _eventProgress = progress!;
     }
@@ -76,7 +72,6 @@ class PipTimer {
 
   // 暂停计时
   void pause() {
-    print("timer pause");
     if (_eventName == TimerState.pause || _eventName == TimerState.idle) return;
     _eventName = TimerState.pause;
     _eventTime = DateTime.now();

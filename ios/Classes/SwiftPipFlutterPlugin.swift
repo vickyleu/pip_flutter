@@ -6,37 +6,37 @@ import GLKit
 
 
 public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformViewFactory {
-
+    
     private var players = Dictionary<Int, PipFlutter>.init(minimumCapacity: 1)
-
+    
     private var bgTask: UIBackgroundTaskIdentifier?
     private var isInPipMode: Bool = false
-    private var aspect: AspectToken?
-
+//    private var aspect: AspectToken?
+    
     private  static var _sharedInstance: SwiftPipFlutterPlugin?
-
+    
     private lazy var channel: FlutterMethodChannel = {
         FlutterMethodChannel.init(name: "pipflutter_player_channel", binaryMessenger: registrar.messenger())
     }()
-
+    
     private var _dataSourceDict = Dictionary<Int, Dictionary<String, AnyObject>>()
     private var _timeObserverIdDict = Dictionary<String, AnyObject>()
     private var _artworkImageDict = Dictionary<String, MPMediaItemArtwork>()
-
+    
     private var texturesCount: Int = -1
-
+    
     private var _notificationPlayer: PipFlutter?
     private var _remoteCommandsInitialized: Bool = false
-
+    
     private var _cacheManager: PipCacheManager = PipCacheManager()
-
+    
     class func shareInstance() -> SwiftPipFlutterPlugin {
         return _sharedInstance!
     }
-
+    
     private var messenger: FlutterBinaryMessenger
     private var registrar: FlutterPluginRegistrar
-
+    
     init(_ registrar: FlutterPluginRegistrar) {
         self.messenger = registrar.messenger()
         self.registrar = registrar
@@ -46,77 +46,33 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         self.registrar.register(self, withId: "com.pipflutter/pipflutter_player")
         Self._sharedInstance = self
         self._cacheManager.setup()
-
+        
     }
-
+    
     // MARK: - FlutterPlugin protocol
-
+    
     public static func register(with registrar: FlutterPluginRegistrar) {
-       _ = SwiftPipFlutterPlugin(registrar)
+        _ = SwiftPipFlutterPlugin(registrar)
     }
-
+    
     // MARK: - FlutterPlatformViewFactory protocol
-
+    
     public func create(withFrame frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?) -> FlutterPlatformView {
         let textureId = (args as! Dictionary<String, AnyObject>)["textureId"] as! NSNumber
         let player = players[textureId.intValue]
         player!.frame = frame
         return player!
     }
-
     
     
-    private  func initAspect() {
-        if self.aspect != nil {
-            return
+    
+    public func applicationWillTerminate(_ application: UIApplication) {
+        if self.bgTask != nil {
+            application.endBackgroundTask(self.bgTask!)
         }
-        do {
-            // 拿到需要插入执行的 block
-            let wrappedBlock: @convention(block) (AspectInfo) -> Void = { (info:AspectInfo) in
-                if !self.isInPipMode{
-                    var flutterController : FlutterViewController? = nil
-                    let rootVc = UIApplication.shared.keyWindow?.rootViewController
-                    if let navigationVc = rootVc as? UINavigationController {
-                        if let vc = navigationVc.children.first as? FlutterViewController{
-                            flutterController = vc
-                        }
-                    }
-                    if flutterController == nil{
-                        guard let controller:FlutterViewController  = rootVc as? FlutterViewController else {return}
-                        flutterController = controller
-                    }
-                    guard let controller:FlutterViewController = flutterController as? FlutterViewController else {return}
-
-                    if self.players.count != 1{
-                        return
-                    }
-                    if !controller.isKind(of: FlutterViewController.self){
-                        return
-                    }
-                    let players = self.players.map{$0.1}
-                    guard let player:PipFlutter  = players.last else {return}
-                    print("preparePipFrame::::::isPlaying::>>>\(player.isPlaying)   isPiping::>>>\(player.isPiping)")
-                    if player.isPlaying && !player.isPiping {
-                        self.channel.invokeMethod("preparePipFrame", arguments: nil)
-                        self.isInPipMode = true
-                    }
-                }
-            }
-            let wrappedObject: AnyObject = unsafeBitCast(wrappedBlock, to: AnyObject.self)
-            
-            self.aspect = try FlutterViewController.aspect_hook(#selector(FlutterViewController.viewWillLayoutSubviews),with: .positionAfter, usingBlock: wrappedObject)
-        } catch let error {
-            print("\(error.localizedDescription)")
-        }
+        self.bgTask = .invalid
     }
-
-    private  func disposeAspect() {
-        self.aspect?.remove()
-        self.aspect = nil
-        self.isInPipMode = false
-    }
-
-
+    
     public  func applicationWillEnterForeground(_ application: UIApplication) {
         if self.bgTask != nil {
             application.endBackgroundTask(self.bgTask!)
@@ -128,18 +84,34 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
             $0.1
         }
         let player = players.last
-
+        
         if player != nil &&  player!.isPiping {
-            print("invokeMethod exitPip")
-            self.channel.invokeMethod("exitPip", arguments: nil)
+            DispatchQueue.main.async {
+                self.channel.invokeMethod("exitPip", arguments: nil)
+            }
         }
         self.bgTask = .invalid
-        self.isInPipMode = false
-        print("applicationWillEnterForeground exitPip")
-//
-
+        
     }
-
+    
+    
+    public func applicationWillResignActive(_ application: UIApplication) {
+        if self.players.count != 1 {
+            return
+        }
+        let players = self.players.map {
+            $0.1
+        }
+        let player = players.last
+        if player != nil && player!.isPlaying  {
+            if !player!.isPiping {
+                DispatchQueue.main.async {
+                    self.channel.invokeMethod("prepareToPip", arguments: nil)
+                }
+            }
+        }
+    }
+    
     public  func applicationDidEnterBackground(_ application: UIApplication) {
         if self.players.count != 1 {
             return
@@ -148,78 +120,87 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
             $0.1
         }
         let player = players.last
-        if player != nil && player!.isPlaying && !player!.isPiping {
-            print("preparePip to")
-            self.channel.invokeMethod("prepareToPip", arguments: nil)
-            self.backgroundHandler(player!, application)
+        DispatchQueue.global(qos: .background).async {
+            if player != nil && player!.isPlaying {
+                self.backgroundHandler(player!, application)
+            }
         }
     }
-
+    
     func notifyDart(_ player: PipFlutter) {
-
-        let position: Int = Int(player.position())
-        let duration: Int = Int(player.duration())
-
-        self.channel.invokeMethod("pipNotify", arguments: ["position": position, "duration": duration])
+        if player.isInitialized{
+            DispatchQueue.global(qos: .default).async {
+                let position: Int = Int(player.position())
+                let duration: Int = Int(player.duration())
+                DispatchQueue.main.async {
+                    self.channel.invokeMethod("pipNotify", arguments: ["position": position, "duration": duration])
+                }
+            }
+        }
     }
-
+    
     func backgroundHandler(_ player: PipFlutter, _ app: UIApplication) {
         NSLog("### -->backgroundinghandler")
         self.bgTask = app.beginBackgroundTask {
-            NSLog("====任务完成了。。。。。。。。。。。。。。。===>")
-            // [app endBackgroundTask:bgTask];
+//            NSLog("====任务完成了。。。。。。。。。。。。。。。===>")
+//            if self.bgTask != nil{
+//                app.endBackgroundTask(self.bgTask!)
+//            }
         }
         // Start the long-running task
         DispatchQueue.global(qos: .default).async {
             while true && self.bgTask != .invalid {
                 self.notifyDart(player)
-                Thread.sleep(forTimeInterval: 1)
+                Thread.sleep(forTimeInterval: 0.1)
             }
             self.notifyDart(player)
         }
     }
-
+    
     public func detachFromEngine(for registrar: FlutterPluginRegistrar) {
         self.players.map {
-                    $0.1
-                }
-                .forEach { v in
-                    v.disposeSansEventChannel()
-                }
+            $0.1
+        }
+        .forEach { v in
+            v.disposeSansEventChannel()
+        }
         self.players.removeAll()
     }
-
-
+    
+    
     public func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
         FlutterStandardMessageCodec.sharedInstance()
     }
-
-
+    
+    
     // MARK: - SwiftPipFlutterPlugin class
-
+    
     func newTextureId() -> Int {
         texturesCount += 1
         return texturesCount
     }
-
-    func onPlayerSetup(_ player: PipFlutter, result: FlutterResult) {
+    
+    func onPlayerSetup(_ player: PipFlutter, result: @escaping FlutterResult) {
         let textureId = self.newTextureId()
-        let eventChannel = FlutterEventChannel.init(name: "pipflutter_player_channel/videoEvents\(textureId)", binaryMessenger: messenger)
-        player.setMixWithOthers(false)
-        eventChannel.setStreamHandler(player)
-        player.eventChannel = eventChannel
-
-        player.setOnBackgroundCountingListener {
-            self.bgTask = .invalid
+        
+        DispatchQueue.global(qos: .background).async {
+            let eventChannel = FlutterEventChannel.init(name: "pipflutter_player_channel/videoEvents\(textureId)", binaryMessenger: self.messenger)
+            player.setMixWithOthers(false)
+            self.players[textureId] = player
+            DispatchQueue.main.async {
+                eventChannel.setStreamHandler(player)
+                player.eventChannel = eventChannel
+                player.setOnBackgroundCountingListener {
+                    self.bgTask = .invalid
+                }
+                
+                result(["textureId": textureId])
+            }
         }
-
-        self.players[textureId] = player
-
-        result(["textureId": textureId])
+        
     }
-
-//
-
+    
+    
     func setupRemoteNotification(_ player: PipFlutter) {
         _notificationPlayer = player
         self.stopOtherUpdateListener(player)
@@ -231,7 +212,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         }
         if let title = dataSource["title"] as? String ,
            let author = dataSource["author"] as? String
-           {
+        {
             let imageUrl = dataSource["imageUrl"] as? String
             if showNotification {
                 self.setRemoteCommandsNotificationActive()
@@ -241,8 +222,8 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
             }
         }
     }
-
-
+    
+    
     func setRemoteCommandsNotificationActive() {
         do {
             try AVAudioSession.sharedInstance().setActive(true)
@@ -250,8 +231,8 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         }
         UIApplication.shared.beginReceivingRemoteControlEvents()
     }
-
-
+    
+    
     func setRemoteCommandsNotificationNotActive() {
         if self.players.count == 0 {
             do {
@@ -261,7 +242,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         }
         UIApplication.shared.endReceivingRemoteControlEvents()
     }
-
+    
     func setupRemoteCommands(_ player: PipFlutter) {
         if _remoteCommandsInitialized {
             return
@@ -297,13 +278,13 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
             }
             return .success
         }
-
-
+        
+        
         if #available(iOS 9.1, *) {
             commandCenter.changePlaybackPositionCommand.addTarget { event in
                 if self._notificationPlayer != nil {
                     let playbackEvent = event as! MPChangePlaybackPositionCommandEvent
-
+                    
                     let time: CMTime = CMTimeMake(value: Int64(playbackEvent.positionTime), timescale: 1)
                     let millis = PipFlutterTimeUtils.timeToMillis(time)
                     self._notificationPlayer!.seekTo(location:  Int((millis)))
@@ -311,17 +292,18 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 }
                 return .success
             }
-
+            
         }
         _remoteCommandsInitialized = true
     }
-
-
+    
+    
     func setupRemoteCommandNotification(_ player: PipFlutter, _ title: String, _ author: String, _ imageUrl: String?) {
-        let positionInSeconds: Float = Float(player.position() / 1000)
-        let durationInSeconds: Float = Float(player.duration() / 1000)
-
-
+        
+        let positionInSeconds: Float = Float(!player.isInitialized ? 0 : (player.position() / 1000))
+        let durationInSeconds: Float = Float(!player.isInitialized ? 0 : (player.duration() / 1000))
+        
+        
         var nowPlayingInfoDict: [String: AnyObject] = [
             MPMediaItemPropertyArtist: author as AnyObject,
             MPMediaItemPropertyTitle: title as AnyObject,
@@ -329,12 +311,12 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
             MPMediaItemPropertyPlaybackDuration: NSNumber(value: durationInSeconds),
             MPNowPlayingInfoPropertyPlaybackRate: NSNumber(value: 1)
         ]
-
-
+        
+        
         if imageUrl != nil {
             let key: String! = self.getTextureId(player)
             let artworkImage = _artworkImageDict[key]
-
+            
             if key != nil {
                 if (artworkImage != nil) {
                     nowPlayingInfoDict[MPMediaItemPropertyArtwork] = artworkImage
@@ -352,15 +334,17 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                                 let image = tempArtworkImage!
                                 let boundsSize = CGSize(width: image.size.width, height: image.size.height)
                                 let artworkImage = MPMediaItemArtwork(image: image)
-//                                let artworkImage = MPMediaItemArtwork.init(boundsSize: boundsSize) { size in
-//                                    return image
-//                                }
+                                //                                let artworkImage = MPMediaItemArtwork.init(boundsSize: boundsSize) { size in
+                                //                                    return image
+                                //                                }
                                 self?._artworkImageDict[key] = artworkImage
                                 nowPlayingInfoDict[MPMediaItemPropertyArtwork] = artworkImage
                             }
-                            MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfoDict
+                            DispatchQueue.main.async {
+                                MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfoDict
+                            }
                         } catch  {
-
+                            
                         }
                     }
                 }
@@ -369,10 +353,8 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfoDict
         }
     }
-
-//
-
-//
+    
+    
     func getTextureId(_ player: PipFlutter) -> String {
         let temp = self.players.allKeysForValue(val: player)
         if temp.count==0{
@@ -381,9 +363,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         let key = temp.last!
         return "\(key)"
     }
-
-//
-
+    
     func setupUpdateListener(_ player: PipFlutter, _ title: String, _ author: String, _ imageUrl: String?) {
         let _timeObserverId = player.player.addPeriodicTimeObserver(forInterval: CMTimeMake(value: 1, timescale: 1), queue: nil) { time in
             self.setupRemoteCommandNotification(player, title, author, imageUrl)
@@ -391,8 +371,8 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         let key = self.getTextureId(player)
         _timeObserverIdDict[key] = _timeObserverId
     }
-
-
+    
+    
     func disposeNotificationData(player: PipFlutter!) {
         if player == _notificationPlayer {
             _notificationPlayer = nil
@@ -402,16 +382,16 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
         var _timeObserverId = _timeObserverIdDict[key]
         _timeObserverIdDict.removeValue(forKey: key)
         _artworkImageDict.removeValue(forKey: key)
-
+        
         if (_timeObserverId != nil) {
             player.player.removeTimeObserver(_timeObserverId! as Any)
             _timeObserverId = nil
         }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = [:]
     }
-
-//
-
+    
+    //
+    
     func stopOtherUpdateListener(_ player: PipFlutter) {
         let currentPlayerTextureId: String! = self.getTextureId(player)
         for (textureId, timeObserverId) in _timeObserverIdDict {
@@ -422,19 +402,30 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
             playerToRemoveListener?.player.removeTimeObserver(timeObserverId)
         }
         _timeObserverIdDict.removeAll()
-
+        
     }
     
     
-
+    
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "init":
             //Allow audio playback when the Ring/Silent switch is set to silent
+            
             self.players.forEach { (key: Int, value: PipFlutter) in
                 value.dispose()
             }
             self.players.removeAll()
+            
+            result(nil)
+            break
+        case "viewDidDisappear":
+            result(nil)
+            break
+        case "viewDidLayoutSubviews":
+            result(nil)
+            break
+        case "viewWillLayoutSubviews":
             result(nil)
             break
         case "create":
@@ -447,66 +438,90 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 result(nil)
                 return
             }
+            switch call.method {
+            case "pipNotify":
+                break
+            case "isPictureInPictureSupported":
+                break
+            case "absolutePosition":
+                break
+            case "position":
+                break
+            case "play":
+                break
+            case "pause":
+                break
+            default:
+                print(" call.method=======>>\( call.method)")
+            }
             switch call.method{
             case "setDataSource":
-                player.clear()
-                // This call will clear cached frame because we will return transparent frame
-                let dataSource = argsMap["dataSource"] as! Dictionary<String,AnyObject>
-                _dataSourceDict[Int(self.getTextureId(player))!] = dataSource
-                let assetArg = dataSource["asset"] as? String
-                let uriArg = dataSource["uri"] as? String
-                let key = dataSource["key"] as! String
-                let certificateUrl = dataSource["certificateUrl"] as? String
-                let licenseUrl = dataSource["licenseUrl"] as? String
-                var headers = dataSource["headers"] as? Dictionary<String,AnyObject>
-                let cacheKey = dataSource["cacheKey"] as? String
-                let maxCacheSize = dataSource["maxCacheSize"] as? Int
-                let videoExtension = dataSource["videoExtension"] as? String
-                var overriddenDuration:Int = 0
-                if !dataSource["overriddenDuration"].isNsnullOrNil() {
-                    print("\(dataSource["overriddenDuration"])")
-                    overriddenDuration = dataSource["overriddenDuration"] as! Int
-                }
-
-                var useCache:Bool = false
-                let useCacheObject = dataSource["useCache"] as? Bool
-                if useCacheObject != nil {
-                    useCache = useCacheObject! as Bool
-                    if useCache {
-                        _cacheManager.setMaxCacheSize(NSNumber(value: maxCacheSize!))
-                    }
-                }
-                if headers == nil {
-                    headers = [:]
-                }
-                if (assetArg != nil) {
-                    var assetPath:String
-                    let package = dataSource["package"] as? String
-                    if package != nil {
-                        assetPath = registrar.lookupKey(forAsset: assetArg!, fromPackage: package!)
-                    } else {
-                        assetPath = registrar.lookupKey(forAsset: assetArg!)
-                    }
-                    player.setDataSourceAsset(asset: assetPath, withKey: key, withCertificateUrl: certificateUrl, withLicenseUrl: licenseUrl, cacheKey: cacheKey, cacheManager: _cacheManager, overriddenDuration: overriddenDuration)
-                   
-                } else if (uriArg != nil) {
-                    guard let uri = uriArg,
-                          let encodedURI = uri.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed),
-                          let url = URL(string: encodedURI) else {
-                        // 处理 URL 无法创建的情况，可能是 uriArg 为 nil 或者 uriArg 不是一个有效的 URL 字符串
-                        print("Invalid URL")
-                        return
+                DispatchQueue.global(qos: .background).async {
+                    player.clear()
+                    // This call will clear cached frame because we will return transparent frame
+                    let dataSource = argsMap["dataSource"] as! Dictionary<String,AnyObject>
+                    self._dataSourceDict[Int(self.getTextureId(player))!] = dataSource
+                    let assetArg = dataSource["asset"] as? String
+                    let uriArg = dataSource["uri"] as? String
+                    let key = dataSource["key"] as! String
+                    let certificateUrl = dataSource["certificateUrl"] as? String
+                    let licenseUrl = dataSource["licenseUrl"] as? String
+                    var headers = dataSource["headers"] as? Dictionary<String,AnyObject>
+                    let cacheKey = dataSource["cacheKey"] as? String
+                    let maxCacheSize = dataSource["maxCacheSize"] as? Int
+                    let videoExtension = dataSource["videoExtension"] as? String
+                    var overriddenDuration:Int = 0
+                    if !dataSource["overriddenDuration"].isNsnullOrNil() {
+                        overriddenDuration = dataSource["overriddenDuration"] as! Int
                     }
                     
-                    player.setDataSourceURL(url: url, withKey: key, withCertificateUrl: certificateUrl, withLicenseUrl: licenseUrl, withHeaders: headers!, withCache: useCache, cacheKey: cacheKey, cacheManager: _cacheManager, overriddenDuration: overriddenDuration, videoExtension: videoExtension)
-                } else {
-                    result(FlutterMethodNotImplemented)
-                    return
+                    var useCache:Bool = false
+                    let useCacheObject = dataSource["useCache"] as? Bool
+                    if useCacheObject != nil {
+                        useCache = useCacheObject! as Bool
+                        if useCache {
+                            self._cacheManager.setMaxCacheSize(NSNumber(value: maxCacheSize!))
+                        }
+                    }
+                    if headers == nil {
+                        headers = [:]
+                    }
+                    if (assetArg != nil) {
+                        var assetPath:String
+                        let package = dataSource["package"] as? String
+                        if package != nil {
+                            assetPath = self.registrar.lookupKey(forAsset: assetArg!, fromPackage: package!)
+                        } else {
+                            assetPath = self.registrar.lookupKey(forAsset: assetArg!)
+                        }
+                        player.setDataSourceAsset(asset: assetPath, withKey: key, withCertificateUrl: certificateUrl, withLicenseUrl: licenseUrl, cacheKey: cacheKey, cacheManager: self._cacheManager, overriddenDuration: overriddenDuration)
+                        DispatchQueue.main.async {
+                            result(nil)
+                        }
+                    } else if (uriArg != nil) {
+                        guard let uri = uriArg,
+                              let encodedURI = uri.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed),
+                              let url = URL(string: encodedURI) else {
+                            // 处理 URL 无法创建的情况，可能是 uriArg 为 nil 或者 uriArg 不是一个有效的 URL 字符串
+                            print("Invalid URL")
+                            DispatchQueue.main.async {
+                                result(nil)
+                            }
+                            return
+                        }
+                        player.setDataSourceURL(url: url, withKey: key, withCertificateUrl: certificateUrl, withLicenseUrl: licenseUrl, withHeaders: headers!, withCache: useCache, cacheKey: cacheKey, cacheManager: self._cacheManager, overriddenDuration: overriddenDuration, videoExtension: videoExtension)
+                        DispatchQueue.main.async {
+                            result(nil)
+                        }
+                    }
+                    else {
+                        result(FlutterMethodNotImplemented)
+                        return
+                    }
                 }
-                result(nil)
                 break
             case "dispose":
-                self.disposeAspect()
+                self.isInPipMode=false
                 player.disablePictureInPicture()
                 player.clear()
                 self.disposeNotificationData(player: player)
@@ -524,7 +539,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 // https://github.com/flutter/flutter/commit/8159a9906095efc9af8b223f5e232cb63542ad0b is in
                 // stable And update the min flutter version of the plugin to the stable version.
                 DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(600), execute:
-                {
+                                                {
                     if !player.disposed{
                         player.dispose()
                     }
@@ -546,68 +561,71 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 result(nil)
                 break
             case "play":
-                self.setupRemoteNotification(player)
-                player.play()
-                self.initAspect()
-               
+                DispatchQueue.global(qos: .background).async {
+                    self.setupRemoteNotification(player)
+                    DispatchQueue.main.async {
+                        player.play()
+                        if !self.isInPipMode{
+                            self.channel.invokeMethod("preparePipFrame", arguments: nil)
+                        }
+                    }
+                }
                 result(nil)
                 break
             case "position":
-                DispatchQueue.main.async {
-                    result(player.position())
+                DispatchQueue.global(qos: .background).async {
+                    let position = player.position()
+                    DispatchQueue.main.async {
+                        result(position)
+                    }
                 }
                 break
             case "absolutePosition":
-                DispatchQueue.main.async {
-                    result(player.absolutePosition())
+                DispatchQueue.global(qos: .background).async {
+                    let position = player.absolutePosition()
+                    DispatchQueue.main.async {
+                        result(position)
+                    }
                 }
                 break
             case "seekTo":
-                DispatchQueue.main.async {
-                    player.seekTo(location: argsMap["location"] as! Int)
-                    result(nil)
-                }
+                player.seekTo(location: argsMap["location"] as! Int)
+                result(nil)
                 break
             case "pause":
-                DispatchQueue.main.async {
-                    player.pause()
-                    result(nil)
-                }
+                player.pause()
+                result(nil)
                 break
             case "setSpeed":
-                DispatchQueue.main.async {
-                    player.setSpeed(argsMap["speed"] as! Double, result:result)
-                    result(nil)
-                }
+                player.setSpeed(argsMap["speed"] as! Double, result:result)
+                result(nil)
                 break
             case "setTrackParameters":
                 let width = argsMap["width"] as! Int
                 let height = argsMap["height"] as! Int
                 let bitrate = argsMap["bitrate"] as! Int
-                DispatchQueue.main.async {
+                DispatchQueue.global(qos: .background).async {
                     player.setTrackParameters(width, height, bitrate)
-                    result(nil)
                 }
+                result(nil)
                 break
             case "enablePictureInPicture":
                 let left = argsMap["left"] as! Double
                 let top = argsMap["top"] as! Double
                 let width = argsMap["width"] as! Double
                 let height = argsMap["height"] as! Double
-                DispatchQueue.main.async {
                     player.enablePictureInPicture(frame: CGRect.init(x: left, y: top, width: width, height: height))
-                    result(nil)
-                }
+                    self.isInPipMode = true
+                result(nil)
                 break
             case "enablePictureInPictureFrame":
                 let left = argsMap["left"] as! Double
                 let top = argsMap["top"] as! Double
                 let width = argsMap["width"] as! Double
                 let height = argsMap["height"] as! Double
-                DispatchQueue.main.async {
-                    player.playerLayerSetup(frame: CGRect.init(x: left, y: top, width: width, height: height))
-                    result(nil)
-                }
+                // 应用程序已经进入后台，执行你的操作
+                player.playerLayerSetup(frame: CGRect.init(x: left, y: top, width: width, height: height))
+                result(nil)
                 break
             case "isPictureInPictureSupported":
                 if #available(iOS 9.0, *) {
@@ -619,23 +637,27 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 result(false)
                 break
             case "disablePictureInPicture":
+                let isFullScreen = argsMap["isFullScreen"] as! Bool
+              
                 DispatchQueue.main.async {
                     player.disablePictureInPictureNoAction()
-                    result(nil)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(1500)) {
-                        [weak player] in
-                        player?.disablePictureInPicture()
+                    player.disablePictureInPicture()
+                    self.isInPipMode = false
+                    DispatchQueue.global(qos: .background).asyncAfter(deadline: .now()+0.5){
+                        if player.isPlaying {
+                            if !self.isInPipMode{
+                                self.channel.invokeMethod("preparePipFrame", arguments: nil)
+                            }
+                        }
                     }
+//                    DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(100)) {
+//                        [weak player] in
+//                       
+//                        
+//                        
+//                    }
                 }
-//                DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + .milliseconds(1500), execute: {
-////                DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + .milliseconds(1500), execute: {
-//                    [weak player] in
-//                    player?.disablePictureInPicture()
-////                    player?.mPictureInPicture = false
-//                })
-//                player.mPictureInPicture = false
-                
-               
+                result(nil)
                 break
             case "setAudioTrack":
                 let name = argsMap["name"] as! String
@@ -654,7 +676,7 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                 var headers = dataSource["headers"]as? Dictionary<String,AnyObject>
                 let maxCacheSize = dataSource["maxCacheSize"] as? Int
                 var videoExtension = dataSource["videoExtension"] as? String
-
+                
                 if headers == nil {
                     headers = [:]
                 }
@@ -662,15 +684,18 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
                     videoExtension = nil
                 }
                 if urlArg != nil {
-                    let url = URL.init(string: urlArg!)!
-                    if self._cacheManager.isPreCacheSupported(url: url, videoExtension: videoExtension) {
-                        self._cacheManager.setMaxCacheSize(NSNumber(value: maxCacheSize!))
-                        self._cacheManager.preCacheURL(url, cacheKey: cacheKey, videoExtension: videoExtension, withHeaders: headers!) { success in
-
+                    DispatchQueue.global(qos: .background).async {
+                        let url = URL.init(string: urlArg!)!
+                        if self._cacheManager.isPreCacheSupported(url: url, videoExtension: videoExtension) {
+                            self._cacheManager.setMaxCacheSize(NSNumber(value: maxCacheSize!))
+                            self._cacheManager.preCacheURL(url, cacheKey: cacheKey, videoExtension: videoExtension, withHeaders: headers!) { success in
+                                
+                            }
+                        }else{
+                            print("Pre cache is not supported for given data source.")
                         }
-                    }else{
-                        print("Pre cache is not supported for given data source.")
                     }
+                    
                 }
                 result(nil)
                 break
@@ -700,45 +725,46 @@ public  class SwiftPipFlutterPlugin: NSObject, FlutterPlugin, FlutterPlatformVie
             break
         }
     }
+    
 }
 
 extension Dictionary where Value: Equatable {
     func allKeysForValue(val: Value) -> [Key] {
         return self.filter {
-                    $1 == val
-                }
-                .map {
-                    $0.0
-                }
+            $1 == val
+        }
+        .map {
+            $0.0
+        }
     }
 }
 
 extension Optional where Wrapped: AnyObject {
     func isNsnullOrNil() -> Bool
-       {
-           if (self is NSNull) || (self == nil)
-           {
-               return true
-           }
-           else
-           {
-               return false
-           }
-       }
+    {
+        if (self is NSNull) || (self == nil)
+        {
+            return true
+        }
+        else
+        {
+            return false
+        }
+    }
 }
 
 extension Optional where Wrapped: NSObject {
     func isNsnullOrNil() -> Bool
-       {
-           if (self is NSNull) || (self == nil)
-           {
-               return true
-           }
-           else
-           {
-               return false
-           }
-       }
+    {
+        if (self is NSNull) || (self == nil)
+        {
+            return true
+        }
+        else
+        {
+            return false
+        }
+    }
 }
 
 

@@ -32,3 +32,48 @@ extension URL {
         return urlComponents.url!
     }
 }
+
+
+func createImage(from byteArray: [UInt8]) -> UIImage? {
+    // 将 UInt8 数组转换为 Data
+    let imageData = Data(byteArray)
+
+    // 使用 Data 创建 UIImage
+    if let image = UIImage(data: imageData) {
+        return image
+    } else {
+        print("Failed to create UIImage from data")
+        return nil
+    }
+}
+
+// 从UIImage获取像素数据的扩展
+extension UIImage {
+    func scaleImage(toSize newSize: CGSize) -> UIImage? {
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        
+        let scaledImage = renderer.image { (context) in
+            self.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+        
+        return scaledImage
+    }
+
+    func toUint8List() -> [UInt8]? {
+        guard let cgImage = self.cgImage else {
+            return nil
+        }
+
+        guard let data = self.pngData() else {
+            return nil
+        }
+        // new constructor:
+        let pixelData = [UInt8](data)
+
+//        // …or old style through pointers:
+//        let pixelData = data.withUnsafeBytes {
+//            [UInt8](UnsafeBufferPointer(start: $0, count: data.count))
+//        }
+        return pixelData
+    }
+}

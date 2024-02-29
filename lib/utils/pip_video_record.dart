@@ -41,8 +41,6 @@ class PipVideoRecord {
   }
 
   static PipVideoRecord fromJson(Map<String, dynamic> json) {
-    JsonEncoder encoder = const JsonEncoder.withIndent('  ');
-    // print("PipVideoRecord fromJson:${encoder.convert(json)}");
     return PipVideoRecord(
       id: json.containsKey('id') ? json['id'] : 0,
       eventName: json['event_name'],

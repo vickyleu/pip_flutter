@@ -19,11 +19,11 @@ class VideoPlayerValue {
   /// rest will initialize with default values when unset.
   VideoPlayerValue({
     required this.duration,
-    required  this.alreadyBuffered,
     this.size,
     this.position = const Duration(),
     this.absolutePosition,
     this.buffered = const <DurationRange>[],
+    this.image = const <int>[],
     this.isPlaying = false,
     this.isLooping = false,
     this.isBuffering = false,
@@ -34,12 +34,12 @@ class VideoPlayerValue {
   });
 
   /// Returns an instance with a `null` [Duration].
-  VideoPlayerValue.uninitialized() : this(duration: null,alreadyBuffered: List.empty(growable: true));
+  VideoPlayerValue.uninitialized() : this(duration: null);
 
   /// Returns an instance with a `null` [Duration] and the given
   /// [errorDescription].
   VideoPlayerValue.erroneous(String errorDescription)
-      : this(duration: null, errorDescription: errorDescription,alreadyBuffered: List.empty(growable: true));
+      : this(duration: null, errorDescription: errorDescription);
 
   /// The total duration of the video.
   ///
@@ -56,12 +56,7 @@ class VideoPlayerValue {
 
   /// The currently buffered ranges.
   final List<DurationRange> buffered;
-
-
-  final List<DurationRange> alreadyBuffered;
-
-
-
+  final List<int> image;
 
   /// True if the video is playing. False if it's paused.
   final bool isPlaying;
@@ -119,6 +114,7 @@ class VideoPlayerValue {
     Duration? position,
     DateTime? absolutePosition,
     List<DurationRange>? buffered,
+    List<int>? image,
     bool? isPlaying,
     bool? isLooping,
     bool? isBuffering,
@@ -137,10 +133,10 @@ class VideoPlayerValue {
       isLooping: isLooping ?? this.isLooping,
       isBuffering: isBuffering ?? this.isBuffering,
       volume: volume ?? this.volume,
+      image: image ?? this.image,
       speed: speed ?? this.speed,
       errorDescription: errorDescription ?? this.errorDescription,
       isPip: isPip ?? this.isPip,
-      alreadyBuffered: alreadyBuffered,
     );
   }
 
@@ -153,7 +149,7 @@ class VideoPlayerValue {
         'position: $position, '
         'absolutePosition: $absolutePosition, '
         'buffered: [${buffered.join(', ')}], '
-        'isPlaying: ${isPlaying||isBuffering}, '
+        'isPlaying: $isPlaying, '
         'isLooping: $isLooping, '
         'isBuffering: $isBuffering, '
         'volume: $volume, '
@@ -186,7 +182,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     this.pipFrameCallback,
     this.pipInBackgroundCallback,
     bool autoCreate = true,
-  }) : super(VideoPlayerValue(duration: null,alreadyBuffered: List.empty(growable: true))) {
+  }) : super(VideoPlayerValue(duration: null)) {
     if (autoCreate) {
       _create();
     }
@@ -228,15 +224,26 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       switch (event.eventType) {
         case VideoEventType.initialized:
           value = value.copyWith(
+            position: event.position,
             duration: event.duration,
             size: event.size,
             // isPlaying: true
           );
-          _initializingCompleter.complete(null);
+          if (!_initializingCompleter.isCompleted){
+            _initializingCompleter.complete(null);
+          }
           _applyPlayPause(); //TODO 自动播放
           break;
+        case VideoEventType.thumbnail:
+          value = value.copyWith(image:event.image);
+          notifyListeners();
+          break;
         case VideoEventType.completed:
-          value = value.copyWith(isPlaying: false, position: value.duration);
+          if(value.position.inMilliseconds > 0 && (value.isPlaying)){ // ||value.isBuffering
+            value = value.copyWith(isPlaying: false, position: value.duration);
+          }else{
+            value = value.copyWith(isPlaying: false,position: Duration.zero);
+          }
           _timer?.cancel();
           break;
         case VideoEventType.bufferingUpdate:
@@ -250,7 +257,6 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
             value = value.copyWith(isBuffering: false);
           }
           break;
-
         case VideoEventType.play:
           value = value.copyWith(isPlaying: true);
           // play(); //TODO check this !!!!
@@ -265,12 +271,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           break;
         case VideoEventType.pipStart:
           //收到pipStart
-          print("统计回放播放时长 VideoEventType.pipStart ");
           value = value.copyWith(isPip: true);
           break;
         case VideoEventType.pipStop:
         //收到pipStart
-          print("统计回放播放时长 VideoEventType.pipStop ");
           value = value.copyWith(isPip: false);
           // value.notifyListener();
           break;
@@ -296,6 +300,8 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         .videoEventsFor(_textureId)
         .listen(eventListener, onError: errorListener);
 
+
+    VideoPlayerPlatform.instance.setNativeLifeCycleCallback(true);
     VideoPlayerPlatform.instance.setPipLifeCycleCallback(pipLifeCycleCallback);
     VideoPlayerPlatform.instance.setPipFrameCallback(pipFrameCallback);
     VideoPlayerPlatform.instance
@@ -427,15 +433,17 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     if (_isDisposed) {
       return;
     }
-
     value = VideoPlayerValue(
       duration: null,
       isLooping: value.isLooping,
-      volume: value.volume,alreadyBuffered: List.empty(growable: true)
+      volume: value.volume,
     );
 
     if (!_creatingCompleter.isCompleted) await _creatingCompleter.future;
 
+    try{
+      _initializingCompleter?.complete();
+    }catch(_){}
     _initializingCompleter = Completer<void>();
 
     await VideoPlayerPlatform.instance
@@ -445,6 +453,9 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
   @override
   Future<void> dispose() async {
+    try{
+      _initializingCompleter?.complete();
+    }catch(_){}
     await _creatingCompleter.future;
     if (!_isDisposed) {
       _isDisposed = true;
@@ -455,6 +466,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       videoEventStreamController.close();
       pipLifeCycleCallback = null;
       pipInBackgroundCallback = null;
+      VideoPlayerPlatform.instance.setNativeLifeCycleCallback(false);
       VideoPlayerPlatform.instance.setPipLifeCycleCallback(null);
       VideoPlayerPlatform.instance.setPipInBackgroundCallback(null);
     }
@@ -506,7 +518,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     if ((value.isPlaying)) {
       await _videoPlayerPlatform.play(_textureId);
       _timer = Timer.periodic(
-        const Duration(milliseconds: 600),
+        const Duration(milliseconds: 300),
         (Timer timer) async {
           if (_isDisposed) {
             return;
@@ -580,8 +592,11 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     if (_isDisposed) {
       return;
     }
+    if(position==null||value.duration==null){
+     return;
+    }
 
-    Duration? positionToSeek = position;
+    Duration? positionToSeek = position!;
     if (position! > value.duration!) {
       positionToSeek = value.duration;
     } else if (position < const Duration()) {
@@ -591,7 +606,6 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
     await _videoPlayerPlatform.seekTo(_textureId, positionToSeek);
     _updatePosition(position);
-
     if (isPlaying) {
       play();
     } else {
@@ -644,8 +658,8 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         textureId, top, left, width, height);
   }
 
-  Future<void> disablePictureInPicture() async {
-    await _videoPlayerPlatform.disablePictureInPicture(textureId);
+  Future<void> disablePictureInPicture(bool isFullScreen) async {
+    await _videoPlayerPlatform.disablePictureInPicture(textureId,isFullScreen);
   }
 
   void _updatePosition(Duration? position, {DateTime? absolutePosition}) {

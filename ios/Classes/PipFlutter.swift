@@ -55,6 +55,9 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     
     var frame:CGRect = .zero
     
+    let semaphore = DispatchSemaphore(value: 0)
+    
+    
     var isLooping=false
     private(set)var isInitialized=false
     private(set) var key:String?
@@ -63,6 +66,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     var mPictureInPicture=false
     private(set) var playerToGoPipFlag=true
     var observersAdded=false
+    
     
     var stalledCount:Int = 0
     var isStalledCheckStarted=false
@@ -107,11 +111,15 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         self.observersAdded = false
     }
     
+
+    
     public func view() -> UIView {
         let playerView = PipFlutterView(frame:self.frame)
         playerView.player = self.player
         return playerView
     }
+    
+    
     
     func addObservers(item:AVPlayerItem!) {
         if !self.observersAdded {
@@ -284,11 +292,11 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             if certificateUrl != nil && certificateUrl!.lengthOfBytes(using: .utf8) > 0 {
                 self.loaderDelegate =   PipFlutterEzDrmAssetsLoaderDelegate.init(URL.init(string: certificateUrl!)!, URL.init(string: licenseUrl!)!)
                 //            dispatch_queue_attr_t qos = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INTERACTIVE, -1);
-               
+                
             }else{
-                 self.loaderDelegate =   PipFlutterEzDrmAssetsLoaderDelegate.init()
+                self.loaderDelegate =   PipFlutterEzDrmAssetsLoaderDelegate.init()
             }
-            let streamQueue = DispatchQueue.init(label: "streamQueue")
+            let streamQueue = DispatchQueue.init(label: "streamQueue",qos: .default)
             asset.resourceLoader.setDelegate(self.loaderDelegate, queue: streamQueue)
             item = AVPlayerItem(asset: asset)
             item.preferredForwardBufferDuration = TimeInterval(50)
@@ -306,35 +314,89 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         self.stalledCount = 0
         self.isStalledCheckStarted = false
         self.playerRate = 1
+        self.player.usesExternalPlaybackWhileExternalScreenIsActive = true
+        self.player.allowsExternalPlayback = true
         self.player.replaceCurrentItem(with: item)
         
         let asset = item.asset
-        let assetCompletionHandler:()->Void = {
-            if asset.statusOfValue(forKey: "tracks", error: nil) == .loaded {
-                let tracks = asset.tracks(withMediaType: AVMediaType.video)
-                if tracks.count > 0 {
-                    let videoTrack = tracks[0]
-                    let trackCompletionHandler:()->Void = {
-                        if self.disposed {return}
-                        if videoTrack.statusOfValue(forKey: "preferredTransform", error: nil) == .loaded{
-                            // Rotate the video by using a videoComposition and the preferredTransform
-                            self.preferredTransform = self.fixTransform(videoTrack: videoTrack)
-                            // Note:
-                            // https://developer.apple.com/documentation/avfoundation/avplayeritem/1388818-videocomposition
-                            // Video composition can only be used with file-based media and is not supported for
-                            // use with media served using HTTP Live Streaming.
-                            let videoComposition = self.getVideoCompositionWithTransform(transform: self.preferredTransform!,
-                                                                                         withAsset:asset,
-                                                                                         withVideoTrack:videoTrack)
-                            item.videoComposition = videoComposition
+        
+        DispatchQueue.global(qos: .default).async {
+            if !self.isInitialized {
+                self.semaphore.wait() // 等待信号量，直到被信号
+            }
+            // 在这里执行你的后续任务
+            if self.disposed || self.key == nil {
+                return
+            }
+            DispatchQueue.main.async {
+                let frame = self.frame
+                DispatchQueue.global(qos: .background).async {
+                    let assetCompletionHandler:()->Void = {
+                        if asset.statusOfValue(forKey: "tracks", error: nil) == .loaded {
+                            let tracks = asset.tracks(withMediaType: AVMediaType.video)
+                            if tracks.count > 0 {
+                                let videoTrack = tracks[0]
+                                let trackCompletionHandler:()->Void = {
+                                    if self.disposed {return}
+                                    if videoTrack.statusOfValue(forKey: "preferredTransform", error: nil) == .loaded{
+                                        // Rotate the video by using a videoComposition and the preferredTransform
+                                        self.preferredTransform = self.fixTransform(videoTrack: videoTrack)
+                                        // Note:
+                                        // https://developer.apple.com/documentation/avfoundation/avplayeritem/1388818-videocomposition
+                                        // Video composition can only be used with file-based media and is not supported for
+                                        // use with media served using HTTP Live Streaming.
+                                        let videoComposition = self.getVideoCompositionWithTransform(transform: self.preferredTransform!,
+                                                                                                     withAsset:asset,
+                                                                                                     withVideoTrack:videoTrack)
+                                        item.videoComposition = videoComposition
+                                    }
+                                }
+                                videoTrack.loadValuesAsynchronously(forKeys: ["preferredTransform"],completionHandler: trackCompletionHandler)
+                                
+                            }
                         }
                     }
-                    videoTrack.loadValuesAsynchronously(forKeys: ["preferredTransform"],completionHandler: trackCompletionHandler)
+                    asset.loadValuesAsynchronously(forKeys: ["tracks"],completionHandler: assetCompletionHandler)
                     
+                    
+                    let generator = AVAssetImageGenerator(asset: asset)
+                    generator.appliesPreferredTrackTransform = true
+                    // 设置要获取缩略图的时间点，这里设置为视频的第一帧
+                    let time = CMTimeMakeWithSeconds(1.5, preferredTimescale: 1)
+                    do {
+                        let times = [NSValue(time: time)]
+                        DispatchQueue.global(qos: .background).asyncAfter(deadline: .now()+0.2){
+                            try? generator.generateCGImagesAsynchronously(forTimes: times) {  _, image, _, _, _ in
+                                if let image = image {
+                                    DispatchQueue.global(qos: .background).async {
+                                        // 获取缩略图
+                                        let thumbnailImage = UIImage(cgImage: image)
+                                        //                                frame
+                                        guard let scaleImage = thumbnailImage.scaleImage(toSize: CGSize(width: frame.width, height: frame.height)) else {return}
+                                        guard let array = scaleImage.toUint8List() else {return}
+                                        // guard let img = createImage(from: array)  else {
+                                        //     return
+                                        // }
+                                        // 调用completion回调并传递缩略图
+                                        DispatchQueue.main.async {
+                                            if (self.eventSink != nil) {
+                                                self.eventSink!(["event" : "thumbnail","value":FlutterStandardTypedData(bytes:Data(array)), "key" : self.key as Any])
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                    } catch let error {
+                        print("Error generating thumbnail: \(error.localizedDescription)")
+                        // 调用completion回调并传递nil表示失败
+                    }
                 }
             }
+            
         }
-        asset.loadValuesAsynchronously(forKeys: ["tracks"],completionHandler: assetCompletionHandler)
+        
         
         self.addObservers(item: item)
     }
@@ -530,6 +592,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     }
     
     func updatePlayingState() {
+        print("在播放吗:\(self.isPlaying)")
         if !self.isInitialized || (self.key == nil) {
             return
         }
@@ -537,7 +600,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             self.addObservers(item: self.player.currentItem)
         }
         
-        if self.wasPlaying {
+        if self.isPlaying {
             if #available(iOS 10.0, *) {
                 self.player.playImmediately(atRate: 1.0)
                 self.player.rate = self.playerRate
@@ -558,45 +621,56 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             if self.player.status != .readyToPlay {
                 return
             }
+            if self.isInitialized {
+                return
+            }
             
             let size = self.player.currentItem?.presentationSize
             let width = size?.width ?? 0
             let height = size?.height ?? 0
             
-            
-            let asset = self.player.currentItem?.asset
-            let onlyAudio = (asset?.tracks(withMediaType: .video).count ?? 0) == 0
-            
-            // The player has not yet initialized.
-            if !onlyAudio && height == CGSizeZero.height && width == CGSizeZero.width {
-                return
+            DispatchQueue.global(qos: .background).async {
+                let asset = self.player.currentItem?.asset
+                let onlyAudio = (asset?.tracks(withMediaType: .video).count ?? 0) == 0
+                
+                // The player has not yet initialized.
+                if !onlyAudio && height == CGSizeZero.height && width == CGSizeZero.width {
+                    return
+                }
+                
+                let isLive:Bool = CMTIME_IS_INDEFINITE(self.player.currentItem!.duration)
+                // The player may be initialized but still needs to determine the duration.
+                let durationFromPlayer = self.duration()
+                if isLive == false && durationFromPlayer == 0 {
+                    return
+                }
+                
+                //Fix from https://github.com/flutter/flutter/issues/66413
+                let track = self.player.currentItem!.tracks.first!
+                let naturalSize = track.assetTrack!.naturalSize
+                let prefTrans = track.assetTrack!.preferredTransform
+                let realSize:CGSize = CGSizeApplyAffineTransform(naturalSize, prefTrans)
+                
+                let duration = PipFlutterTimeUtils.timeToMillis( self.player.currentItem!.asset.duration)
+                if self.overriddenDuration > 0 && duration > self.overriddenDuration {
+                    self.player.currentItem!.forwardPlaybackEndTime = CMTimeMake(value: Int64(self.overriddenDuration/1000), timescale: 1)
+                }
+                DispatchQueue.main.async {
+                    if self.isInitialized {
+                      return
+                    }
+                    self.isInitialized = true
+                    self.updatePlayingState()
+                    self.eventSink?([
+                        "event" : "initialized",
+                        "duration" : durationFromPlayer,
+                        "width" : abs(realSize.width) == 0 ?abs(realSize.width): width,
+                        "height" : abs(realSize.height) == 0 ? abs(realSize.height): height,
+                        "key" : self.key!
+                    ])
+                    self.semaphore.signal()
+                }
             }
-            let isLive:Bool = CMTIME_IS_INDEFINITE(self.player.currentItem!.duration)
-            // The player may be initialized but still needs to determine the duration.
-            if isLive == false && self.duration() == 0 {
-                return
-            }
-            
-            //Fix from https://github.com/flutter/flutter/issues/66413
-            let track = self.player.currentItem!.tracks.first!
-            let naturalSize = track.assetTrack!.naturalSize
-            let prefTrans = track.assetTrack!.preferredTransform
-            let realSize:CGSize = CGSizeApplyAffineTransform(naturalSize, prefTrans)
-            
-            let duration = PipFlutterTimeUtils.timeToMillis( self.player.currentItem!.asset.duration)
-            if self.overriddenDuration > 0 && duration > self.overriddenDuration {
-                self.player.currentItem!.forwardPlaybackEndTime = CMTimeMake(value: Int64(self.overriddenDuration/1000), timescale: 1)
-            }
-            
-            self.isInitialized = true
-            self.updatePlayingState()
-            self.eventSink?([
-                "event" : "initialized",
-                "duration" : self.duration(),
-                "width" : abs(realSize.width) == 0 ?abs(realSize.width): width,
-                "height" : abs(realSize.height) == 0 ? abs(realSize.height): height,
-                "key" : self.key!
-            ])
         }
     }
     
@@ -614,12 +688,18 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     }
     
     func position() -> Int64 {
+        if !self.isInitialized {
+            return 0
+        }
         let  time =  self.player.currentItem?.currentTime() ?? .zero
         let millis = PipFlutterTimeUtils.timeToMillis(time)
         return millis
     }
     
     func absolutePosition() -> Int64 {
+        if !self.isInitialized {
+            return 0
+        }
         if self.player.currentItem!.currentDate() != nil {
             return PipFlutterTimeUtils.timeToMillis(CMTime(value: CMTimeValue(self.player.currentItem!.currentDate()!.timeIntervalSince1970), timescale: 1) )
         }else{
@@ -628,19 +708,37 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         
     }
     
+    // mark: 一次查询有可能取不到正确的值,多查几次
     func duration() -> Int64 {
-        var time:CMTime
-        if #available(iOS 13, *) {
-            time =  self.player.currentItem?.duration ?? .zero
-        } else {
-            time =  self.player.currentItem?.asset.duration ?? .zero
+        func query()->Int64{
+            var time:CMTime
+            if #available(iOS 13, *) {
+                time =  self.player.currentItem?.duration ?? .zero
+            } else {
+                time =  self.player.currentItem?.asset.duration ?? .zero
+            }
+            if !CMTIME_IS_INVALID(self.player.currentItem?.forwardPlaybackEndTime ?? .zero) {
+                time = self.player.currentItem!.forwardPlaybackEndTime
+            }
+            return PipFlutterTimeUtils.timeToMillis(time)
         }
-        if !CMTIME_IS_INVALID(self.player.currentItem?.forwardPlaybackEndTime ?? .zero) {
-            time = self.player.currentItem!.forwardPlaybackEndTime
+        var millis:Int64 = 0
+        millis = query()
+        if millis <= 0 {
+            let semaphore = DispatchSemaphore(value: 0)
+            var count = 0
+            DispatchQueue.global(qos: .background).async {
+                while count<3 && millis<=0 {
+                    millis = query()
+                    count+=1
+                    Thread.sleep(forTimeInterval: 0.1)
+                }
+                semaphore.signal()
+            }
+            semaphore.wait()
         }
-        
-        return PipFlutterTimeUtils.timeToMillis(time)
-    }
+        return millis
+   }
     
     var wasPlaying: Bool{
         get{
@@ -658,9 +756,9 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             self.player.pause()
         }
         self.player.currentItem?.seek(to: CMTimeMake(value: Int64(location), timescale: 1000),
-                         toleranceBefore:CMTime.zero,
-                         toleranceAfter:CMTime.zero,
-                         completionHandler:{ (finished:Bool) in
+                                      toleranceBefore:CMTime.zero,
+                                      toleranceAfter:CMTime.zero,
+                                      completionHandler:{ (finished:Bool) in
             if wasPlaying {
                 self.player.rate = self.playerRate
                 self.player.play()
@@ -718,21 +816,17 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     
     
     func setPictureInPicture(pictureInPicture:Bool) {
-        self.mPictureInPicture = pictureInPicture
         if #available(iOS 9.0, *) {
+            self.mPictureInPicture = pictureInPicture
             if (self.pipController != nil) && self.mPictureInPicture && !self.pipController!.isPictureInPictureActive {
-                
-                DispatchQueue.main.async {
-                    self.pipController!.startPictureInPicture()
-                }
+                self.pipController!.startPictureInPicture()
             } else if (self.pipController != nil) && !self.mPictureInPicture && self.pipController!.isPictureInPictureActive {
                 DispatchQueue.main.async {
                     self.pipController!.stopPictureInPicture()
                     self.playerToGoPipFlag=true
                 }
-            } else {
-                // Fallback on earlier versions
-            } }
+            }
+        }
     }
     
     func setRestoreUserInterfaceForPIPStopCompletionHandler(restore:Bool) {
@@ -754,8 +848,6 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
                 }
                 self.pipController!.delegate = self
             }
-        } else {
-            // Fallback on earlier versions
         }
     }
     
@@ -792,9 +884,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
             return
         }
         self.playerLayer!.isHidden=false
-        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(200), execute:{
-            self.setPictureInPicture(pictureInPicture: true)
-        })
+        self.setPictureInPicture(pictureInPicture: true)
     }
     
     func disablePictureInPictureNoAction() {
@@ -815,28 +905,28 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
     }
     
     public func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-        print("pictureInPictureControllerDidStopPictureInPicture")
+        print(" pictureInPictureControllerDidStopPictureInPicture")
         //        self.disablePictureInPicture()
     }
     
     public func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         self.eventSink?(["event" : "pipStart"])
-        print("pictureInPictureControllerDidStartPictureInPicture")
+        print(" pictureInPictureControllerDidStartPictureInPicture")
     }
     
     
     public func pictureInPictureControllerWillStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-        print("pictureInPictureControllerWillStopPictureInPicture")
+        print(" pictureInPictureControllerWillStopPictureInPicture")
     }
     
     
     public func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-        print("pictureInPictureControllerWillStartPictureInPicture")
+        print(" pictureInPictureControllerWillStartPictureInPicture")
     }
     
     public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
         //画中画播放器启动失败
-        print("failedToStartPictureInPictureWithError:: \(error)")
+        print("call.method=======>> failedToStartPictureInPictureWithError:: \(error)")
     }
     
     public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
@@ -844,7 +934,7 @@ public class PipFlutter : NSObject, FlutterPlatformView, FlutterStreamHandler, A
         self.setRestoreUserInterfaceForPIPStopCompletionHandler(restore: true)
         
         //画中画播放停止的事件
-        print("restoreUserInterfaceForPictureInPictureStopWithCompletionHandler")
+        print(" restoreUserInterfaceForPictureInPictureStopWithCompletionHandler")
     }
     
     func setAudioTrack(_ name:String, index:Int) {

@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
-import 'package:focus_detector/focus_detector.dart';
 import 'package:pip_flutter/pipflutter_player_configuration.dart';
 import 'package:pip_flutter/pipflutter_player_controller.dart';
 import 'package:pip_flutter/pipflutter_player_controller_event.dart';
@@ -17,14 +16,14 @@ import 'package:pip_flutter/pipflutter_player_with_controls.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'package:wakelock/wakelock.dart';
 
-export 'package:pip_flutter/pipflutter_player_notification_configuration.dart';
-export 'package:pip_flutter/pipflutter_player_controls_configuration.dart';
 export 'package:pip_flutter/pipflutter_player_configuration.dart';
 export 'package:pip_flutter/pipflutter_player_controller.dart';
+export 'package:pip_flutter/pipflutter_player_controls_configuration.dart';
 export 'package:pip_flutter/pipflutter_player_data_source.dart';
 export 'package:pip_flutter/pipflutter_player_data_source_type.dart';
 export 'package:pip_flutter/pipflutter_player_event.dart';
 export 'package:pip_flutter/pipflutter_player_event_type.dart';
+export 'package:pip_flutter/pipflutter_player_notification_configuration.dart';
 export 'package:pip_flutter/utils/pip_flutter_timer.dart';
 export 'package:pip_flutter/utils/pip_video_record.dart';
 
@@ -220,6 +219,7 @@ class _PipFlutterPlayerState extends State<PipFlutterPlayer>
 
   Widget _fullScreenRoutePageBuilder(
     BuildContext context,
+    Orientation orientation,
     Animation<double> animation,
     Animation<double> secondaryAnimation,
   ) {
@@ -237,69 +237,85 @@ class _PipFlutterPlayerState extends State<PipFlutterPlayer>
   }
 
   Future<dynamic> _pushFullScreenWidget(BuildContext context) async {
+    var lastOrientation = MediaQuery.of(context).orientation;
+
+    final targetOrientation = () {
+      if (_pipFlutterPlayerConfiguration
+              .autoDetectFullscreenDeviceOrientation ==
+          true) {
+        final aspectRatio =
+            widget.controller.videoPlayerController?.value.aspectRatio ?? 1.0;
+        List<DeviceOrientation> deviceOrientations;
+        if (aspectRatio < 1.0) {
+          deviceOrientations = [
+            DeviceOrientation.portraitUp,
+            DeviceOrientation.portraitDown
+          ];
+        } else {
+          deviceOrientations = [
+            DeviceOrientation.landscapeLeft,
+            DeviceOrientation.landscapeRight
+          ];
+        }
+        return deviceOrientations;
+      } else {
+        return widget.controller.pipFlutterPlayerConfiguration
+            .deviceOrientationsOnFullScreen;
+      }
+    }();
+
     final TransitionRoute<void> route = PageRouteBuilder<void>(
       settings: const RouteSettings(),
-      pageBuilder: _fullScreenRoutePageBuilder,
+      pageBuilder: (context, animation, secondaryAnimation) =>
+          OrientationBuilder(
+        builder: (context, orientation) {
+          if (orientation == Orientation.portrait &&
+              lastOrientation == Orientation.landscape && _isFullScreen) {
+            SchedulerBinding.instance.addPostFrameCallback((timeStamp) {
+              widget.controller.setControlsEnabled(true);
+              Future.delayed(Duration.zero).then((value)async{
+                Navigator.of(context, rootNavigator: true).pop();
+              });
+            });
+          }
+          lastOrientation = orientation;
+          return _fullScreenRoutePageBuilder(
+              context, orientation, animation, secondaryAnimation);
+        },
+      ),
     );
 
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-    if (_pipFlutterPlayerConfiguration.autoDetectFullscreenDeviceOrientation ==
-        true) {
-      final aspectRatio =
-          widget.controller.videoPlayerController?.value.aspectRatio ?? 1.0;
-      List<DeviceOrientation> deviceOrientations;
-      print("enterFullScreen called _pushFullScreenWidget ${aspectRatio}");
-      if (aspectRatio < 1.0) {
-        deviceOrientations = [
-          DeviceOrientation.portraitUp,
-          DeviceOrientation.portraitDown
-        ];
-      } else {
-        deviceOrientations = [
-          DeviceOrientation.landscapeLeft,
-          DeviceOrientation.landscapeRight
-        ];
-      }
-      await SystemChrome.setPreferredOrientations(deviceOrientations);
-    } else {
-      print("enterFullScreen called _pushFullScreenWidget  ${widget.controller.pipFlutterPlayerConfiguration
-          .deviceOrientationsOnFullScreen}");
-      await SystemChrome.setPreferredOrientations(
-        widget.controller.pipFlutterPlayerConfiguration
-            .deviceOrientationsOnFullScreen,
-      );
-    }
+    await SystemChrome.setPreferredOrientations(targetOrientation);
 
     if (!_pipFlutterPlayerConfiguration.allowedScreenSleep) {
-      Wakelock.enable();
+      await Wakelock.enable();
     }
-
     await Navigator.of(context, rootNavigator: true).push(route);
     _isFullScreen = false;
     widget.controller.exitFullScreen();
-
     // The wakelock plugins checks whether it needs to perform an action internally,
     // so we do not need to check Wakelock.isEnabled.
-    Wakelock.disable();
-
+    await Wakelock.disable();
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-        overlays: _pipFlutterPlayerConfiguration.systemOverlaysAfterFullScreen);
+        overlays:
+        _pipFlutterPlayerConfiguration.systemOverlaysAfterFullScreen);
     await SystemChrome.setPreferredOrientations(
         _pipFlutterPlayerConfiguration.deviceOrientationsAfterFullScreen);
   }
 
   Widget _buildPlayer() {
     return VisibilityDetector(
-        key: Key("${widget.controller.hashCode}_key"),
-        onVisibilityChanged: (VisibilityInfo info){
-          var visiblePercentage = info.visibleFraction * 100;
-          widget.controller.onPlayerVisibilityChanged(info.visibleFraction);
-        },
-        child: PipFlutterPlayerWithControls(
-          controller: widget.controller,
-        ),
-      );
+      key: Key("${widget.controller.hashCode}_key"),
+      onVisibilityChanged: (VisibilityInfo info) {
+        var visiblePercentage = info.visibleFraction * 100;
+        widget.controller.onPlayerVisibilityChanged(info.visibleFraction);
+      },
+      child: PipFlutterPlayerWithControls(
+        controller: widget.controller,
+      ),
+    );
   }
 
   @override

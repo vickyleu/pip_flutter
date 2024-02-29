@@ -18,14 +18,25 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
     return _channel.invokeMethod<void>('init');
   }
 
-
-
   @override
   Future<void> dispose(int? textureId) {
     return _channel.invokeMethod<void>(
       'dispose',
       <String, dynamic>{'textureId': textureId},
     );
+  }
+
+  @override
+  Future<void> viewDidDisappear() {
+    return _channel.invokeMethod<void>('viewDidDisappear');
+  }
+  @override
+  Future<void> viewDidLayoutSubviews() {
+    return _channel.invokeMethod<void>('viewDidLayoutSubviews');
+  }
+  @override
+  Future<void> viewWillLayoutSubviews() {
+    return _channel.invokeMethod<void>('viewWillLayoutSubviews');
   }
 
   @override
@@ -52,31 +63,46 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
           : null;
     }
 
-    _channel.setMethodCallHandler((call)async{
-    switch(call.method){
-      case 'preparePipFrame':
-        pipFrameCallback?.call();
-        break;
-      case 'prepareToPip':
-        pipLifeCycleCallback?.call(true);
-        break;
-      case 'exitPip':
-        pipLifeCycleCallback?.call(false);
-        break;
-      case 'pipNotify':
-        try{
-          final map = call.arguments as Map<dynamic,dynamic>;
-          int position = map['position'];
-          int duration = map['duration'];
-          pipInBackgroundCallback?.call(position,duration);
-        }catch (e){
-          print("eeee==>>$e");
-        }
-        break;
-    }
+    _channel.setMethodCallHandler((call) async {
+      switch (call.method) {
+        case "pipNotify":
+          break;
+        case "absolutePosition":
+          break;
+        case "position":
+          break;
+        case "play":
+          break;
+        case "pause":
+          break;
+        default:
+          print("call.method==>${call.method}");
+      }
+      switch (call.method) {
+        case 'preparePipFrame':
+          pipFrameCallback?.call();
+          break;
+        case 'prepareToPip':
+          pipLifeCycleCallback?.call(true);
+          break;
+        case 'exitPip':
+          pipLifeCycleCallback?.call(false);
+          break;
+        case 'pipNotify':
+          try {
+            final map = call.arguments as Map<dynamic, dynamic>;
+            int position = map['position'];
+            int duration = map['duration'];
+            pipInBackgroundCallback?.call(position, duration);
+          } catch (e) {
+            print("eeee==>>$e");
+          }
+          break;
+      }
     });
     return response?['textureId'] as int?;
   }
+
 
   @override
   Future<void> setDataSource(int? textureId, DataSource dataSource) async {
@@ -261,9 +287,11 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
         'height': height,
       },
     );
-  }  @override
-  Future<void> enablePictureInPictureFrame(int? textureId, double? top, double? left,
-      double? width, double? height) async {
+  }
+
+  @override
+  Future<void> enablePictureInPictureFrame(int? textureId, double? top,
+      double? left, double? width, double? height) async {
     return _channel.invokeMethod<void>(
       'enablePictureInPictureFrame',
       <String, dynamic>{
@@ -287,11 +315,12 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   }
 
   @override
-  Future<void> disablePictureInPicture(int? textureId) {
+  Future<void> disablePictureInPicture(int? textureId, bool isFullScreen) {
     return _channel.invokeMethod<bool>(
       'disablePictureInPicture',
       <String, dynamic>{
         'textureId': textureId,
+        'isFullScreen': isFullScreen,
       },
     );
   }
@@ -360,6 +389,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   Stream<VideoEvent> videoEventsFor(int? textureId) {
     return _eventChannelFor(textureId)
         .receiveBroadcastStream()
+        .distinct()
         .map((dynamic event) {
       late Map<dynamic, dynamic> map;
       if (event is Map) {
@@ -367,13 +397,10 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
       }
       final String? eventType = map["event"] as String?;
       final String? key = map["key"] as String?;
-      // print("统计回放播放时长 videoEventsFor ${eventType}");
-
       switch (eventType) {
         case 'initialized':
           double width = 0;
           double height = 0;
-
           try {
             if (map.containsKey("width")) {
               final num widthNum = map["width"] as num;
@@ -386,14 +413,18 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
           } catch (exception) {
             PipFlutterPlayerUtils.log(exception.toString());
           }
-
           final Size size = Size(width, height);
+          final duration = Duration(milliseconds: map['duration'] as int);
           return VideoEvent(
             eventType: VideoEventType.initialized,
             key: key,
-            duration: Duration(milliseconds: map['duration'] as int),
+            duration: duration,
             size: size,
           );
+        case 'thumbnail':
+          final image = map['value'] as List<int>;
+          return VideoEvent(
+              eventType: VideoEventType.thumbnail, key: key, image: image);
         case 'completed':
           return VideoEvent(
             eventType: VideoEventType.completed,
@@ -458,6 +489,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   }
 
   final viewType = 'com.pipflutter/pipflutter_player';
+
   @override
   Widget buildView(int? textureId) {
     if (defaultTargetPlatform == TargetPlatform.iOS) {

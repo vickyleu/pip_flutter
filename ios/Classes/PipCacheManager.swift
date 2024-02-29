@@ -28,8 +28,12 @@ public class PipCacheManager{
         let webServer = GCDWebServer()
         let cache = PINCache.shared
         let urlSession = URLSession.shared
-        server = HLSCachingReverseProxyServer(webServer: webServer, urlSession: urlSession, cache: cache)
-        server?.start(port: 8080)
+        DispatchQueue.global(qos: .background).async {
+            self.server = HLSCachingReverseProxyServer(webServer: webServer, urlSession: urlSession, cache: cache)
+            DispatchQueue.main.async {
+                self.server?.start(port: 8080)
+            }
+        }
     }
     
     
