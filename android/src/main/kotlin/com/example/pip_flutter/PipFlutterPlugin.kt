@@ -730,7 +730,6 @@ class PipFlutterPlugin : FlutterPlugin, ActivityAware, MethodCallHandler,
     }
 
     private fun dispose(player: PipFlutterPlayer, textureId: Long) {
-        Log.wtf("mother fucker dispose", "dispose: ${Log.getStackTraceString(Throwable())}")
         player.dispose()
         videoPlayers.remove(textureId)
         dataSources.remove(textureId)

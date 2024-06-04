@@ -857,7 +857,6 @@ internal class PipFlutterPlayer(
 
     private var isPip = false
     fun isPiping(): Boolean {
-        Log.wtf("fucker isPiping()", "isPip:$isPip")
         return isPip
     }
 
