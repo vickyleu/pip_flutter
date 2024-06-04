@@ -244,8 +244,8 @@ class PipFlutterPlayerControlsConfiguration {
   ///Setup PipFlutterPlayerControlsConfiguration based on Theme options.
   factory PipFlutterPlayerControlsConfiguration.theme(ThemeData theme) {
     return PipFlutterPlayerControlsConfiguration(
-      textColor: theme.textTheme.bodyText1?.color ?? Colors.white,
-      iconsColor: theme.textTheme.button?.color ?? Colors.white,
+      textColor: theme.textTheme.displayMedium?.color ?? Colors.white,
+      iconsColor: theme.textTheme.displayMedium?.color ?? Colors.white,
     );
   }
 }
