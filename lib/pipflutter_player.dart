@@ -28,7 +28,7 @@ export 'package:pip_flutter/utils/pip_flutter_timer.dart';
 export 'package:pip_flutter/utils/pip_video_record.dart';
 
 ///Widget which uses provided controller to render video player.
-class PipFlutterPlayer extends StatefulWidget {
+class PipFlutterPlayer  extends StatefulWidget {
   const PipFlutterPlayer({Key? key, required this.controller})
       : super(key: key);
 
@@ -67,7 +67,7 @@ class PipFlutterPlayer extends StatefulWidget {
 }
 
 class _PipFlutterPlayerState extends State<PipFlutterPlayer>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver{
   PipFlutterPlayerConfiguration get _pipFlutterPlayerConfiguration =>
       widget.controller.pipFlutterPlayerConfiguration;
 
@@ -125,7 +125,9 @@ class _PipFlutterPlayerState extends State<PipFlutterPlayer>
     ///state.
     if (_isFullScreen) {
       WakelockPlus.disable();
-      _navigatorState.maybePop();
+      try{
+        _navigatorState.maybePop();
+      }catch(e){}
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
           overlays:
               _pipFlutterPlayerConfiguration.systemOverlaysAfterFullScreen);
